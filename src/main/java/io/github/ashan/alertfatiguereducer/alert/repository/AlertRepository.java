@@ -1,4 +1,9 @@
 package io.github.ashan.alertfatiguereducer.alert.repository;
 
-public interface AlertRepository extends org.springframework.data.jpa.repository.JpaRepository<io.github.ashan.alertfatiguereducer.alert.entity.Alert, java.lang.Long> {
+import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface AlertRepository extends JpaRepository<Alert, Long> {
 }
