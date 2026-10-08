@@ -150,4 +150,52 @@ class AlertControllerTest {
 
         verifyNoInteractions(alertService);
     }
+
+    @Test
+    void shouldRejectUnsupportedAlertType() throws Exception {
+
+        CreateAlertRequest request = new CreateAlertRequest(
+                AlertSource.CUSTOM,
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                "UNKNOWN_ALERT",
+                AlertSeverity.WARNING,
+                "Unknown alert type",
+                LocalDateTime.now().minusMinutes(1),
+                "unknown_metric",
+                100.0,
+                90.0
+        );
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(alertService);
+    }
+
+    @Test
+    void shouldRejectLowercaseAlertType() throws Exception {
+
+        CreateAlertRequest request = new CreateAlertRequest(
+                AlertSource.CUSTOM,
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                "cpu_high",
+                AlertSeverity.WARNING,
+                "CPU usage exceeded threshold",
+                LocalDateTime.now().minusMinutes(1),
+                "cpu_usage",
+                94.5,
+                90.0
+        );
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(alertService);
+    }
 }
