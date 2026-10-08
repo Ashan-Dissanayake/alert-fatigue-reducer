@@ -4,6 +4,7 @@ package io.github.ashan.alertfatiguereducer.alert.dto.request;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertSeverity;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertSource;
+import io.github.ashan.alertfatiguereducer.alert.validation.PastOrPresentTimestamp;
 import jakarta.validation.constraints.*;
 
 import java.time.LocalDateTime;
@@ -31,6 +32,7 @@ public record CreateAlertRequest(
         String message,
 
         @NotNull
+        @PastOrPresentTimestamp
         LocalDateTime timestamp,
 
         @Size(max = 100)

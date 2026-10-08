@@ -126,4 +126,28 @@ class AlertControllerTest {
 
         verifyNoInteractions(alertService);
     }
+
+    @Test
+    void shouldRejectFutureTimestamp() throws Exception {
+
+        CreateAlertRequest request = new CreateAlertRequest(
+                AlertSource.CUSTOM,
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                "CPU_HIGH",
+                AlertSeverity.WARNING,
+                "CPU usage exceeded 90%",
+                LocalDateTime.now().plusMinutes(5),
+                "cpu_usage",
+                94.5,
+                90.0
+        );
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(alertService);
+    }
 }
