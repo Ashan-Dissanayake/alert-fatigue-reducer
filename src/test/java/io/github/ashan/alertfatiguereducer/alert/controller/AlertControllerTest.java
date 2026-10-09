@@ -1,10 +1,13 @@
 package io.github.ashan.alertfatiguereducer.alert.controller;
 
 import io.github.ashan.alertfatiguereducer.alert.dto.request.CreateAlertRequest;
+import io.github.ashan.alertfatiguereducer.alert.dto.response.AlertCorrelationResponse;
+import io.github.ashan.alertfatiguereducer.alert.dto.response.AlertResponse;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertSeverity;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertSource;
 import io.github.ashan.alertfatiguereducer.alert.service.AlertService;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationAction;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -15,8 +18,10 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AlertController.class)
@@ -30,6 +35,7 @@ class AlertControllerTest {
 
     @MockitoBean
     private AlertService alertService;
+
 
     @Test
     void shouldAcceptValidAlertRequest() throws Exception {
@@ -47,12 +53,46 @@ class AlertControllerTest {
                 90.0
         );
 
+        AlertResponse alertResponse = new AlertResponse(
+                1L,
+                AlertSource.CUSTOM,
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                "CPU_HIGH",
+                AlertSeverity.WARNING,
+                "CPU usage exceeded 90%",
+                LocalDateTime.of(2026, 10, 8, 9, 31),
+                "cpu_usage",
+                94.5,
+                90.0,
+                LocalDateTime.of(2026, 10, 8, 9, 32)
+        );
+
+        AlertCorrelationResponse correlationResponse =
+                new AlertCorrelationResponse(
+                        alertResponse,
+                        CorrelationAction.NEW_INCIDENT,
+                        10L,
+                        0.0
+                );
+
+        when(alertService.createAlert(any(CreateAlertRequest.class)))
+                .thenReturn(correlationResponse);
+
         mockMvc.perform(
                         post("/api/v1/alerts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
                 )
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.alert.id").value(1))
+                .andExpect(jsonPath("$.alert.service").value("order-service"))
+                .andExpect(jsonPath("$.alert.type").value("CPU_HIGH"))
+                .andExpect(jsonPath("$.correlationAction").value("NEW_INCIDENT"))
+                .andExpect(jsonPath("$.incidentId").value(10))
+                .andExpect(jsonPath("$.correlationScore").value(0.0));
+
+        verify(alertService).createAlert(any(CreateAlertRequest.class));
     }
 
     @Test
