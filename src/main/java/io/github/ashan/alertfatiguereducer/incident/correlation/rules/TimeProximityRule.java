@@ -1,6 +1,7 @@
 package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
 import org.springframework.stereotype.Component;
@@ -16,7 +17,10 @@ public class TimeProximityRule implements CorrelationRule {
     private static final double WITHIN_TEN_MINUTES = 0.10;
 
     @Override
-    public double evaluate(Alert alert, Incident incident) {
+    public double evaluate(CorrelationContext context) {
+        var alert = context.alert();
+        var incident = context.incident();
+
         LocalDateTime alertTimestamp = alert.getTimestamp();
         LocalDateTime incidentStartedAt = incident.getStartedAt();
 
