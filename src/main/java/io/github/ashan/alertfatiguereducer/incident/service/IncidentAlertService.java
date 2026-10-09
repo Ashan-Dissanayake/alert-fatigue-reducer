@@ -1,5 +1,6 @@
 package io.github.ashan.alertfatiguereducer.incident.service;
 
+import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.alert.repository.AlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentAlert;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentAlertRepository;
@@ -10,6 +11,8 @@ import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundExce
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -51,5 +54,13 @@ public class IncidentAlertService {
         );
 
         return incidentAlertRepository.save(association);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Alert> findAlertsByIncidentId(Long incidentId) {
+        return incidentAlertRepository.findByIncidentId(incidentId)
+                .stream()
+                .map(IncidentAlert::getAlert)
+                .toList();
     }
 }
