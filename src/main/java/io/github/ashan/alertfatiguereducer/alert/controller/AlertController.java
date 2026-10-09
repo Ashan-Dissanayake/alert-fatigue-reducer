@@ -1,7 +1,7 @@
 package io.github.ashan.alertfatiguereducer.alert.controller;
 
 import io.github.ashan.alertfatiguereducer.alert.dto.request.CreateAlertRequest;
-import io.github.ashan.alertfatiguereducer.alert.dto.response.AlertResponse;
+import io.github.ashan.alertfatiguereducer.alert.dto.response.AlertCorrelationResponse;
 import io.github.ashan.alertfatiguereducer.alert.service.AlertService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ public class AlertController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public AlertResponse createAlert(
+    public AlertCorrelationResponse createAlert(
             @Valid @RequestBody CreateAlertRequest request
     ) {
         return alertService.createAlert(request);

@@ -80,6 +80,7 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                 })
 
 
+
                 .orElseGet(() -> {
                     Incident incident = incidentService.createIncident(
                             new CreateIncidentCommand(
@@ -102,7 +103,7 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
 
                     return new CorrelationResult(
                             CorrelationAction.NEW_INCIDENT,
-                            null,
+                            incident.getId(),
                             0.0
                     );
                 });

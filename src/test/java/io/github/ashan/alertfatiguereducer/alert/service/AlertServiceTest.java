@@ -1,6 +1,7 @@
 package io.github.ashan.alertfatiguereducer.alert.service;
 
 import io.github.ashan.alertfatiguereducer.alert.dto.request.CreateAlertRequest;
+import io.github.ashan.alertfatiguereducer.alert.dto.response.AlertCorrelationResponse;
 import io.github.ashan.alertfatiguereducer.alert.dto.response.AlertResponse;
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
@@ -8,6 +9,9 @@ import io.github.ashan.alertfatiguereducer.alert.entity.AlertSeverity;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertSource;
 import io.github.ashan.alertfatiguereducer.alert.mapper.AlertMapper;
 import io.github.ashan.alertfatiguereducer.alert.repository.AlertRepository;
+import io.github.ashan.alertfatiguereducer.incident.correlation.AlertCorrelationEngine;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationAction;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,8 +23,9 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+
+
 
 @ExtendWith(MockitoExtension.class)
 class AlertServiceTest {
@@ -28,67 +33,69 @@ class AlertServiceTest {
     @Mock
     private AlertRepository alertRepository;
 
-    private AlertMapper alertMapper;
+    @Mock
+    private AlertCorrelationEngine alertCorrelationEngine;
 
+    private AlertMapper alertMapper;
     private AlertService alertService;
 
     @BeforeEach
     void setUp() {
         alertMapper = new AlertMapper();
-        alertService = new AlertService(alertRepository, alertMapper);
+        alertService = new AlertService(
+                alertRepository,
+                alertMapper,
+                alertCorrelationEngine
+        );
     }
 
     @Test
     void shouldCreateAlertSuccessfully() {
-
-        CreateAlertRequest request = new CreateAlertRequest(
-                AlertSource.CUSTOM,
+        CreateAlertRequest request = createRequest(
                 "order-service",
-                AlertEnvironment.PRODUCTION,
                 "CPU_HIGH",
-                AlertSeverity.WARNING,
-                "CPU usage exceeded 90%",
-                LocalDateTime.of(2026, 10, 8, 9, 31),
-                "cpu_usage",
-                94.5,
-                90.0
+                AlertSeverity.WARNING
         );
 
         when(alertRepository.save(any(Alert.class)))
                 .thenAnswer(invocation -> {
                     Alert alert = invocation.getArgument(0);
-
                     alert.setId(1L);
-
                     return alert;
                 });
 
-        AlertResponse response = alertService.createAlert(request);
+        mockCorrelationResult(
+                CorrelationAction.NEW_INCIDENT,
+                10L,
+                0.0
+        );
 
-        assertThat(response.id()).isEqualTo(1L);
-        assertThat(response.service()).isEqualTo("order-service");
-        assertThat(response.type()).isEqualTo("CPU_HIGH");
-        assertThat(response.severity()).isEqualTo(AlertSeverity.WARNING);
-        assertThat(response.environment())
+        AlertCorrelationResponse response =
+                alertService.createAlert(request);
+
+        assertThat(response.alert().id()).isEqualTo(1L);
+        assertThat(response.alert().service()).isEqualTo("order-service");
+        assertThat(response.alert().type()).isEqualTo("CPU_HIGH");
+        assertThat(response.alert().severity())
+                .isEqualTo(AlertSeverity.WARNING);
+        assertThat(response.alert().environment())
                 .isEqualTo(AlertEnvironment.PRODUCTION);
 
+        assertThat(response.correlationAction())
+                .isEqualTo(CorrelationAction.NEW_INCIDENT);
+        assertThat(response.incidentId()).isEqualTo(10L);
+        assertThat(response.correlationScore()).isEqualTo(0.0);
+
         verify(alertRepository).save(any(Alert.class));
+        verify(alertCorrelationEngine).correlate(any(Alert.class));
     }
 
     @Test
     void shouldSetCreatedAtWhenCreatingAlert() {
-
-        CreateAlertRequest request = new CreateAlertRequest(
-                AlertSource.CUSTOM,
+        CreateAlertRequest request = createRequest(
                 "order-service",
-                AlertEnvironment.PRODUCTION,
                 "CPU_HIGH",
-                AlertSeverity.WARNING,
-                "CPU usage exceeded 90%",
-                LocalDateTime.of(2026, 10, 8, 9, 31),
-                "cpu_usage",
-                94.5,
-                90.0
+                AlertSeverity.WARNING
         );
 
         ArgumentCaptor<Alert> alertCaptor =
@@ -97,6 +104,12 @@ class AlertServiceTest {
         when(alertRepository.save(any(Alert.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
+        mockCorrelationResult(
+                CorrelationAction.NEW_INCIDENT,
+                10L,
+                0.0
+        );
+
         alertService.createAlert(request);
 
         verify(alertRepository).save(alertCaptor.capture());
@@ -104,22 +117,15 @@ class AlertServiceTest {
         Alert savedAlert = alertCaptor.getValue();
 
         assertThat(savedAlert.getCreatedAt()).isNotNull();
+        verify(alertCorrelationEngine).correlate(savedAlert);
     }
 
     @Test
     void shouldMapSavedAlertToResponse() {
-
-        CreateAlertRequest request = new CreateAlertRequest(
-                AlertSource.CUSTOM,
+        CreateAlertRequest request = createRequest(
                 "payment-service",
-                AlertEnvironment.PRODUCTION,
                 "ERROR_RATE_HIGH",
-                AlertSeverity.CRITICAL,
-                "Error rate exceeded threshold",
-                LocalDateTime.of(2026, 10, 8, 10, 0),
-                "error_rate",
-                12.5,
-                5.0
+                AlertSeverity.CRITICAL
         );
 
         when(alertRepository.save(any(Alert.class)))
@@ -129,29 +135,35 @@ class AlertServiceTest {
                     return alert;
                 });
 
-        AlertResponse response = alertService.createAlert(request);
+        mockCorrelationResult(
+                CorrelationAction.ATTACHED_TO_INCIDENT,
+                30L,
+                0.85
+        );
 
-        assertThat(response.id()).isEqualTo(25L);
-        assertThat(response.service()).isEqualTo("payment-service");
-        assertThat(response.metric()).isEqualTo("error_rate");
-        assertThat(response.value()).isEqualTo(12.5);
-        assertThat(response.threshold()).isEqualTo(5.0);
+        AlertCorrelationResponse response =
+                alertService.createAlert(request);
+
+        assertThat(response.alert().id()).isEqualTo(25L);
+        assertThat(response.alert().service()).isEqualTo("payment-service");
+        assertThat(response.alert().metric()).isEqualTo("cpu_usage");
+        assertThat(response.alert().value()).isEqualTo(94.5);
+        assertThat(response.alert().threshold()).isEqualTo(90.0);
+
+        assertThat(response.correlationAction())
+                .isEqualTo(CorrelationAction.ATTACHED_TO_INCIDENT);
+        assertThat(response.incidentId()).isEqualTo(30L);
+        assertThat(response.correlationScore()).isEqualTo(0.85);
+
+        verify(alertCorrelationEngine).correlate(any(Alert.class));
     }
 
     @Test
     void shouldPropagateRepositoryException() {
-
-        CreateAlertRequest request = new CreateAlertRequest(
-                AlertSource.CUSTOM,
+        CreateAlertRequest request = createRequest(
                 "order-service",
-                AlertEnvironment.PRODUCTION,
                 "CPU_HIGH",
-                AlertSeverity.WARNING,
-                "CPU usage exceeded 90%",
-                LocalDateTime.of(2026, 10, 8, 9, 31),
-                "cpu_usage",
-                94.5,
-                90.0
+                AlertSeverity.WARNING
         );
 
         when(alertRepository.save(any(Alert.class)))
@@ -160,6 +172,63 @@ class AlertServiceTest {
         org.junit.jupiter.api.Assertions.assertThrows(
                 RuntimeException.class,
                 () -> alertService.createAlert(request)
+        );
+
+        verifyNoInteractions(alertCorrelationEngine);
+    }
+
+    @Test
+    void shouldPropagateCorrelationException() {
+        CreateAlertRequest request = createRequest(
+                "order-service",
+                "CPU_HIGH",
+                AlertSeverity.WARNING
+        );
+
+        when(alertRepository.save(any(Alert.class)))
+                .thenAnswer(invocation -> {
+                    Alert alert = invocation.getArgument(0);
+                    alert.setId(1L);
+                    return alert;
+                });
+
+        when(alertCorrelationEngine.correlate(any(Alert.class)))
+                .thenThrow(new RuntimeException("Correlation failed"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                RuntimeException.class,
+                () -> alertService.createAlert(request)
+        );
+
+        verify(alertRepository).save(any(Alert.class));
+        verify(alertCorrelationEngine).correlate(any(Alert.class));
+    }
+
+    private void mockCorrelationResult(
+            CorrelationAction action,
+            Long incidentId,
+            double score
+    ) {
+        when(alertCorrelationEngine.correlate(any(Alert.class)))
+                .thenReturn(new CorrelationResult(action, incidentId, score));
+    }
+
+    private CreateAlertRequest createRequest(
+            String service,
+            String type,
+            AlertSeverity severity
+    ) {
+        return new CreateAlertRequest(
+                AlertSource.CUSTOM,
+                service,
+                AlertEnvironment.PRODUCTION,
+                type,
+                severity,
+                "Test alert message",
+                LocalDateTime.of(2026, 10, 8, 9, 31),
+                "cpu_usage",
+                94.5,
+                90.0
         );
     }
 }

@@ -64,6 +64,7 @@ class DefaultAlertCorrelationEngineTest {
         CorrelationResult result = engine.correlate(alert);
 
         assertEquals(CorrelationAction.NEW_INCIDENT, result.action());
+        assertEquals(10L, result.incidentId());
         assertEquals(0.0, result.score());
 
         verify(incidentService).createIncident(any(CreateIncidentCommand.class));
@@ -127,9 +128,16 @@ class DefaultAlertCorrelationEngineTest {
         CorrelationResult result = engine.correlate(alert);
 
         assertEquals(CorrelationAction.NEW_INCIDENT, result.action());
-        verify(incidentService).createIncident(any(CreateIncidentCommand.class));
+        assertEquals(40L, result.incidentId());
+        assertEquals(0.0, result.score());
+
+        verify(incidentService)
+                .createIncident(any(CreateIncidentCommand.class));
+
         verify(incidentAlertService).attachAlert(40L, 3L, 0.0);
-        verify(incidentAlertService, never()).attachAlert(30L, 3L, 0.40);
+
+        verify(incidentAlertService, never())
+                .attachAlert(30L, 3L, 0.40);
     }
 
     @Test
