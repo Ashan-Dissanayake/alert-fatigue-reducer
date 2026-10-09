@@ -1,5 +1,6 @@
 package io.github.ashan.alertfatiguereducer.incident.entity;
 
+import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -28,7 +29,6 @@ import java.time.LocalDateTime;
 )
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
 public class Incident {
 
@@ -42,8 +42,9 @@ public class Incident {
     @Column(nullable = false, length = 100)
     private String service;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private String environment;
+    private AlertEnvironment environment;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
