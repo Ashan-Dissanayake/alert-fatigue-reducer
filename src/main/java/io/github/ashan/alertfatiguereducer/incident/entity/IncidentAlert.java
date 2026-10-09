@@ -22,6 +22,9 @@ public class IncidentAlert {
     @Column(name = "alert_id", nullable = false)
     private Long alertId;
 
+    @Column(name = "correlation_score")
+    private Double correlationScore;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "incident_id",
