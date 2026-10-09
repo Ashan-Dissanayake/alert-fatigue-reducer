@@ -6,6 +6,7 @@ import io.github.ashan.alertfatiguereducer.alert.repository.AlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentAlert;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentAlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepository;
+import io.github.ashan.alertfatiguereducer.shared.exception.AlertAlreadyAssociatedException;
 import io.github.ashan.alertfatiguereducer.shared.exception.AlertNotFoundException;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,7 +89,7 @@ class IncidentAlertServiceTest {
                 .thenReturn(true);
 
         assertThrows(
-                IllegalStateException.class,
+                AlertAlreadyAssociatedException.class,
                 () -> incidentAlertService.attachAlert(10L, 101L, 0.85)
         );
 

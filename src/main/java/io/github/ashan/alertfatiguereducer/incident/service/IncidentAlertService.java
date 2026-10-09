@@ -4,6 +4,7 @@ import io.github.ashan.alertfatiguereducer.alert.repository.AlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentAlert;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentAlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepository;
+import io.github.ashan.alertfatiguereducer.shared.exception.AlertAlreadyAssociatedException;
 import io.github.ashan.alertfatiguereducer.shared.exception.AlertNotFoundException;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ public class IncidentAlertService {
     private final IncidentRepository incidentRepository;
     private final AlertRepository alertRepository;
 
-    
+
     @Transactional
     public IncidentAlert attachAlert(
             Long incidentId,
@@ -40,9 +41,7 @@ public class IncidentAlertService {
         }
 
         if (incidentAlertRepository.existsByAlertId(alertId)) {
-            throw new IllegalStateException(
-                    "Alert is already associated with an incident: " + alertId
-            );
+            throw new AlertAlreadyAssociatedException(alertId);
         }
 
         IncidentAlert association = new IncidentAlert(
