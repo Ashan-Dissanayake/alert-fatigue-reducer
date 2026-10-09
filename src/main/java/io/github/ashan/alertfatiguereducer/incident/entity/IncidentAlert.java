@@ -41,9 +41,14 @@ public class IncidentAlert {
     )
     private Alert alert;
 
-    public IncidentAlert(Long incidentId, Long alertId) {
+    public IncidentAlert(
+            Long incidentId,
+            Long alertId,
+            Double correlationScore
+    ) {
         this.incidentId = incidentId;
         this.alertId = alertId;
+        this.correlationScore = correlationScore;
     }
 
 }
