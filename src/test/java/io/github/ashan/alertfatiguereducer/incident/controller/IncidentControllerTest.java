@@ -82,7 +82,7 @@ class IncidentControllerTest {
                 0.75
         );
 
-        when(incidentService.getAllIncidents())
+        when(incidentService.getAllIncidents(null, null))
                 .thenReturn(List.of(incident));
 
         mockMvc.perform(get("/api/v1/incidents"))
@@ -91,5 +91,55 @@ class IncidentControllerTest {
                 .andExpect(jsonPath("$[0].id").value(10))
                 .andExpect(jsonPath("$[0].service").value("order-service"))
                 .andExpect(jsonPath("$[0].status").value("OPEN"));
+    }
+
+    @Test
+    void shouldFilterIncidentsByStatus() throws Exception {
+        IncidentResponse incident = new IncidentResponse(
+                10L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                LocalDateTime.of(2026, 10, 10, 8, 0),
+                LocalDateTime.of(2026, 10, 10, 8, 5),
+                0.75
+        );
+
+        when(incidentService.getAllIncidents(
+                IncidentStatus.OPEN, null))
+                .thenReturn(List.of(incident));
+
+        mockMvc.perform(get("/api/v1/incidents")
+                        .param("status", "OPEN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].status").value("OPEN"));
+    }
+
+    @Test
+    void shouldFilterIncidentsByEnvironment() throws Exception {
+        IncidentResponse incident = new IncidentResponse(
+                10L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                LocalDateTime.of(2026, 10, 10, 8, 0),
+                LocalDateTime.of(2026, 10, 10, 8, 5),
+                0.75
+        );
+
+        when(incidentService.getAllIncidents(
+                null, AlertEnvironment.PRODUCTION))
+                .thenReturn(List.of(incident));
+
+        mockMvc.perform(get("/api/v1/incidents")
+                        .param("environment", "PRODUCTION"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].environment").value("PRODUCTION"));
     }
 }

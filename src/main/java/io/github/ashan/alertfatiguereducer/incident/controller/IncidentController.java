@@ -1,7 +1,9 @@
 package io.github.ashan.alertfatiguereducer.incident.controller;
 
+import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentResponse;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
+import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,8 +29,13 @@ public class IncidentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<IncidentResponse>> getAllIncidents() {
-        List<IncidentResponse> incidents = incidentService.getAllIncidents();
+    public ResponseEntity<List<IncidentResponse>> getAllIncidents(
+            @RequestParam(required = false) IncidentStatus status,
+            @RequestParam(required = false) AlertEnvironment environment
+    ) {
+        List<IncidentResponse> incidents =
+                incidentService.getAllIncidents(status, environment);
+
         return ResponseEntity.ok(incidents);
     }
 }
