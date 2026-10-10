@@ -1,6 +1,7 @@
 package io.github.ashan.alertfatiguereducer.incident.service;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
+import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentResponse;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentSeverity;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
@@ -12,8 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -117,5 +120,176 @@ class IncidentServiceTest {
                 IncidentNotFoundException.class,
                 () -> incidentService.resolveIncident(99L)
         );
+    }
+
+    @Test
+    void shouldReturnAllIncidentsWhenNoFiltersProvided() {
+        Incident incident = new Incident();
+        incident.setId(1L);
+        incident.setTitle("High CPU usage");
+        incident.setService("order-service");
+        incident.setEnvironment(AlertEnvironment.PRODUCTION);
+        incident.setSeverity(IncidentSeverity.WARNING);
+        incident.setStatus(IncidentStatus.OPEN);
+
+        mockFilteredIncidents(List.of(incident));
+
+        IncidentResponse response = new IncidentResponse(
+                1L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                null,
+                null,
+                null
+        );
+
+        when(incidentMapper.toResponse(incident)).thenReturn(response);
+
+        List<IncidentResponse> result =
+                incidentService.getAllIncidents(null, null);
+
+        assertEquals(1, result.size());
+        assertEquals("order-service", result.get(0).service());
+
+        verify(incidentRepository).findAll(
+                org.mockito.ArgumentMatchers
+                        .<Specification<Incident>>any()
+        );
+    }
+
+    @Test
+    void shouldFilterIncidentsByStatus() {
+        Incident incident = new Incident();
+        incident.setId(1L);
+        incident.setTitle("High CPU usage");
+        incident.setService("order-service");
+        incident.setEnvironment(AlertEnvironment.PRODUCTION);
+        incident.setSeverity(IncidentSeverity.WARNING);
+        incident.setStatus(IncidentStatus.OPEN);
+
+        mockFilteredIncidents(List.of(incident));
+
+        IncidentResponse response = new IncidentResponse(
+                1L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                null,
+                null,
+                null
+        );
+
+        when(incidentMapper.toResponse(incident)).thenReturn(response);
+
+        List<IncidentResponse> result =
+                incidentService.getAllIncidents(IncidentStatus.OPEN, null);
+
+        assertEquals(1, result.size());
+        assertEquals(IncidentStatus.OPEN, result.get(0).status());
+
+        verify(incidentRepository).findAll(
+                org.mockito.ArgumentMatchers
+                        .<Specification<Incident>>argThat(spec -> spec != null)
+        );
+    }
+
+    @Test
+    void shouldFilterIncidentsByEnvironment() {
+        Incident incident = new Incident();
+        incident.setId(1L);
+        incident.setTitle("High CPU usage");
+        incident.setService("order-service");
+        incident.setEnvironment(AlertEnvironment.PRODUCTION);
+        incident.setSeverity(IncidentSeverity.WARNING);
+        incident.setStatus(IncidentStatus.OPEN);
+
+        mockFilteredIncidents(List.of(incident));
+
+        IncidentResponse response = new IncidentResponse(
+                1L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                null,
+                null,
+                null
+        );
+
+        when(incidentMapper.toResponse(incident)).thenReturn(response);
+
+        List<IncidentResponse> result =
+                incidentService.getAllIncidents(
+                        null, AlertEnvironment.PRODUCTION
+                );
+
+        assertEquals(1, result.size());
+        assertEquals(
+                AlertEnvironment.PRODUCTION,
+                result.get(0).environment()
+        );
+
+        verify(incidentRepository).findAll(
+                org.mockito.ArgumentMatchers
+                        .<Specification<Incident>>argThat(spec -> spec != null)
+        );
+    }
+
+    @Test
+    void shouldFilterIncidentsByStatusAndEnvironment() {
+        Incident incident = new Incident();
+        incident.setId(1L);
+        incident.setTitle("High CPU usage");
+        incident.setService("order-service");
+        incident.setEnvironment(AlertEnvironment.PRODUCTION);
+        incident.setSeverity(IncidentSeverity.WARNING);
+        incident.setStatus(IncidentStatus.OPEN);
+
+        mockFilteredIncidents(List.of(incident));
+
+        IncidentResponse response = new IncidentResponse(
+                1L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                null,
+                null,
+                null
+        );
+
+        when(incidentMapper.toResponse(incident)).thenReturn(response);
+
+        List<IncidentResponse> result =
+                incidentService.getAllIncidents(
+                        IncidentStatus.OPEN,
+                        AlertEnvironment.PRODUCTION
+                );
+
+        assertEquals(1, result.size());
+        assertEquals(IncidentStatus.OPEN, result.get(0).status());
+        assertEquals(
+                AlertEnvironment.PRODUCTION,
+                result.get(0).environment()
+        );
+
+        verify(incidentRepository).findAll(
+                org.mockito.ArgumentMatchers
+                        .<Specification<Incident>>argThat(spec -> spec != null)
+        );
+    }
+
+    private void mockFilteredIncidents(List<Incident> incidents) {
+        when(incidentRepository.findAll(
+                org.mockito.ArgumentMatchers
+                        .<Specification<Incident>>any()
+        )).thenReturn(incidents);
     }
 }
