@@ -2,16 +2,18 @@ package io.github.ashan.alertfatiguereducer.incident.controller;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentResponse;
-import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
+import io.github.ashan.alertfatiguereducer.shared.config.AllowedIncidentSortFields;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -42,6 +44,20 @@ public class IncidentController {
                     direction = Sort.Direction.DESC
             ) Pageable pageable
     ) {
+        boolean hasInvalidSortField = pageable.getSort()
+                .stream()
+                .anyMatch(order ->
+                        !AllowedIncidentSortFields.FIELDS.contains(order.getProperty())
+                );
+
+        if (hasInvalidSortField) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Unsupported sort field. Allowed fields: "
+                            + AllowedIncidentSortFields.FIELDS
+            );
+        }
+
         Page<IncidentResponse> incidents =
                 incidentService.getAllIncidents(status, environment, pageable);
 
