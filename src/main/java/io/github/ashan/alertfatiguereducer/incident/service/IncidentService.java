@@ -1,24 +1,28 @@
 package io.github.ashan.alertfatiguereducer.incident.service;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
+import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentResponse;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentSeverity;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
+import io.github.ashan.alertfatiguereducer.incident.mapper.IncidentMapper;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepository;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
 @Service
+@RequiredArgsConstructor
 public class IncidentService {
 
     private final IncidentRepository incidentRepository;
+    private final IncidentMapper incidentMapper;
 
-    public IncidentService(IncidentRepository incidentRepository) {
-        this.incidentRepository = incidentRepository;
-    }
+
 
     @Transactional
     public Incident createIncident(CreateIncidentCommand command) {
@@ -52,8 +56,10 @@ public class IncidentService {
     }
 
     @Transactional(readOnly = true)
-    public Incident getIncidentById(Long incidentId) {
-        return incidentRepository.findById(incidentId)
+    public IncidentResponse getIncidentById(Long incidentId) {
+        Incident incident = incidentRepository.findById(incidentId)
                 .orElseThrow(() -> new IncidentNotFoundException(incidentId));
+
+        return incidentMapper.toResponse(incident);
     }
 }

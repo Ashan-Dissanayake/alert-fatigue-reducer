@@ -2,6 +2,7 @@
 package io.github.ashan.alertfatiguereducer.incident.controller;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
+import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentResponse;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentSeverity;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
@@ -31,24 +32,28 @@ class IncidentControllerTest {
 
     @Test
     void shouldReturnIncidentWhenIncidentExists() throws Exception {
-        Incident incident = new Incident();
-        incident.setId(10L);
-        incident.setTitle("High CPU usage");
-        incident.setService("order-service");
-        incident.setEnvironment(AlertEnvironment.PRODUCTION);
-        incident.setSeverity(IncidentSeverity.WARNING);
-        incident.setStatus(IncidentStatus.OPEN);
-        incident.setStartedAt(LocalDateTime.of(2026, 10, 10, 8, 0));
-        incident.setLastUpdatedAt(LocalDateTime.of(2026, 10, 10, 8, 5));
-        incident.setCorrelationScore(0.75);
+        IncidentResponse response = new IncidentResponse(
+                10L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                LocalDateTime.of(2026, 10, 10, 8, 0),
+                LocalDateTime.of(2026, 10, 10, 8, 5),
+                0.75
+        );
 
-        when(incidentService.getIncidentById(10L)).thenReturn(incident);
+        when(incidentService.getIncidentById(10L))
+                .thenReturn(response);
 
         mockMvc.perform(get("/api/v1/incidents/10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(10))
                 .andExpect(jsonPath("$.title").value("High CPU usage"))
                 .andExpect(jsonPath("$.service").value("order-service"))
+                .andExpect(jsonPath("$.environment").value("PRODUCTION"))
+                .andExpect(jsonPath("$.severity").value("WARNING"))
                 .andExpect(jsonPath("$.status").value("OPEN"))
                 .andExpect(jsonPath("$.correlationScore").value(0.75));
     }

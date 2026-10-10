@@ -1,5 +1,6 @@
 package io.github.ashan.alertfatiguereducer.incident.controller;
 
+import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentResponse;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
 import lombok.RequiredArgsConstructor;
@@ -14,11 +15,12 @@ public class IncidentController {
     private final IncidentService incidentService;
 
     @GetMapping("/{incidentId}")
-    public ResponseEntity<Incident> getIncidentById(
+    public ResponseEntity<IncidentResponse> getIncidentById(
             @PathVariable Long incidentId) {
 
-        Incident incident = incidentService.getIncidentById(incidentId);
+        IncidentResponse incidentResponse =
+                incidentService.getIncidentById(incidentId);
 
-        return ResponseEntity.ok(incident);
+        return ResponseEntity.ok(incidentResponse);
     }
 }

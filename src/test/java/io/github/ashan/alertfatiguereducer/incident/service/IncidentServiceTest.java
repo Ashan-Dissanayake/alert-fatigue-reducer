@@ -4,6 +4,7 @@ import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentSeverity;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
+import io.github.ashan.alertfatiguereducer.incident.mapper.IncidentMapper;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepository;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,11 +25,17 @@ class IncidentServiceTest {
     @Mock
     private IncidentRepository incidentRepository;
 
+    @Mock
+    private IncidentMapper incidentMapper;
+
     private IncidentService incidentService;
 
     @BeforeEach
     void setUp() {
-        incidentService = new IncidentService(incidentRepository);
+        incidentService = new IncidentService(
+                incidentRepository,
+                incidentMapper
+        );
     }
 
     @Test
