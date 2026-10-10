@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/incidents")
 @RequiredArgsConstructor
@@ -22,5 +24,11 @@ public class IncidentController {
                 incidentService.getIncidentById(incidentId);
 
         return ResponseEntity.ok(incidentResponse);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<IncidentResponse>> getAllIncidents() {
+        List<IncidentResponse> incidents = incidentService.getAllIncidents();
+        return ResponseEntity.ok(incidents);
     }
 }

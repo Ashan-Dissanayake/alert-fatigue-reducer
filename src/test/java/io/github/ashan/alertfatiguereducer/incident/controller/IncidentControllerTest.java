@@ -15,6 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -65,5 +66,30 @@ class IncidentControllerTest {
 
         mockMvc.perform(get("/api/v1/incidents/999"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnAllIncidents() throws Exception {
+        IncidentResponse incident = new IncidentResponse(
+                10L,
+                "High CPU usage",
+                "order-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.WARNING,
+                IncidentStatus.OPEN,
+                LocalDateTime.of(2026, 10, 10, 8, 0),
+                LocalDateTime.of(2026, 10, 10, 8, 5),
+                0.75
+        );
+
+        when(incidentService.getAllIncidents())
+                .thenReturn(List.of(incident));
+
+        mockMvc.perform(get("/api/v1/incidents"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(10))
+                .andExpect(jsonPath("$[0].service").value("order-service"))
+                .andExpect(jsonPath("$[0].status").value("OPEN"));
     }
 }

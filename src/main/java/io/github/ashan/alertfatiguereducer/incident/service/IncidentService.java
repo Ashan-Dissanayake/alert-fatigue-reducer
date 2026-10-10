@@ -1,19 +1,17 @@
 package io.github.ashan.alertfatiguereducer.incident.service;
 
-import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentResponse;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
-import io.github.ashan.alertfatiguereducer.incident.entity.IncidentSeverity;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
 import io.github.ashan.alertfatiguereducer.incident.mapper.IncidentMapper;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepository;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -61,5 +59,13 @@ public class IncidentService {
                 .orElseThrow(() -> new IncidentNotFoundException(incidentId));
 
         return incidentMapper.toResponse(incident);
+    }
+
+    @Transactional(readOnly = true)
+    public List<IncidentResponse> getAllIncidents() {
+        return incidentRepository.findAll()
+                .stream()
+                .map(incidentMapper::toResponse)
+                .toList();
     }
 }
