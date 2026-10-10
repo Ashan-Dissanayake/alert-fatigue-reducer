@@ -50,4 +50,10 @@ public class IncidentService {
         incident.setStatus(IncidentStatus.RESOLVED);
         incident.setLastUpdatedAt(LocalDateTime.now());
     }
+
+    @Transactional(readOnly = true)
+    public Incident getIncidentById(Long incidentId) {
+        return incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new IncidentNotFoundException(incidentId));
+    }
 }
