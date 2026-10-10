@@ -56,4 +56,32 @@ class TimeProximityRuleTest {
 
         assertEquals(0.0, rule.evaluate(new CorrelationContext(alert, incident, List.of())));
     }
+
+    @Test
+    void shouldReturnHighestScoreWhenAlertIsWithinTwoMinutesAndFiftyNineSeconds() {
+        Alert alert = new Alert();
+        alert.setTimestamp(baseTime.plusMinutes(2).plusSeconds(59));
+
+        Incident incident = new Incident();
+        incident.setStartedAt(baseTime);
+
+        assertEquals(
+                0.25,
+                rule.evaluate(new CorrelationContext(alert, incident, List.of()))
+        );
+    }
+
+    @Test
+    void shouldReturnSameScoreWhenAlertOccursBeforeIncidentStart() {
+        Alert alert = new Alert();
+        alert.setTimestamp(baseTime.minusMinutes(2));
+
+        Incident incident = new Incident();
+        incident.setStartedAt(baseTime);
+
+        assertEquals(
+                0.25,
+                rule.evaluate(new CorrelationContext(alert, incident, List.of()))
+        );
+    }
 }

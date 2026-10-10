@@ -1,9 +1,7 @@
 package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 
-import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
-import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
 import org.springframework.stereotype.Component;
 

@@ -12,6 +12,7 @@ import io.github.ashan.alertfatiguereducer.incident.service.IncidentAlertService
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -173,6 +174,125 @@ class DefaultAlertCorrelationEngineTest {
         verify(incidentAlertService, never()).attachAlert(50L, 4L, 0.75);
         verify(incidentService, never()).createIncident(any());
     }
+
+
+    @Test
+    void shouldUseTenMinuteWindowWhenSearchingForCandidates() {
+        LocalDateTime alertTimestamp =
+                LocalDateTime.of(2026, 10, 10, 10, 30, 0);
+
+        Alert alert = createAlert(5L, "CPU_HIGH", "order-service");
+        alert.setTimestamp(alertTimestamp);
+
+        when(incidentRepository
+                .findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                        eq(IncidentStatus.OPEN),
+                        eq(AlertEnvironment.PRODUCTION),
+                        any(LocalDateTime.class)
+                ))
+                .thenReturn(List.of());
+
+        Incident createdIncident = createIncident(70L);
+
+        when(incidentService.createIncident(any(CreateIncidentCommand.class)))
+                .thenReturn(createdIncident);
+
+        engine.correlate(alert);
+
+        ArgumentCaptor<LocalDateTime> cutoffCaptor =
+                ArgumentCaptor.forClass(LocalDateTime.class);
+
+        verify(incidentRepository)
+                .findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                        eq(IncidentStatus.OPEN),
+                        eq(AlertEnvironment.PRODUCTION),
+                        cutoffCaptor.capture()
+                );
+
+        assertEquals(
+                LocalDateTime.of(2026, 10, 10, 10, 20, 0),
+                cutoffCaptor.getValue()
+        );
+    }
+
+
+    @Test
+    void shouldSumScoresFromAllCorrelationRules() {
+        Alert alert = createAlert(6L, "LATENCY_HIGH", "order-service");
+        Incident candidate = createIncident(80L);
+
+        when(incidentRepository
+                .findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                        eq(IncidentStatus.OPEN),
+                        eq(AlertEnvironment.PRODUCTION),
+                        any(LocalDateTime.class)
+                ))
+                .thenReturn(List.of(candidate));
+
+        when(incidentAlertService.findAlertsByIncidentId(80L))
+                .thenReturn(List.of(createAlert(1L, "CPU_HIGH", "order-service")));
+
+        CorrelationRule secondRule = mock(CorrelationRule.class);
+
+        DefaultAlertCorrelationEngine multiRuleEngine =
+                new DefaultAlertCorrelationEngine(
+                        incidentRepository,
+                        incidentAlertService,
+                        incidentService,
+                        List.of(correlationRule, secondRule)
+                );
+
+        when(correlationRule.evaluate(any(CorrelationContext.class)))
+                .thenReturn(0.40);
+
+        when(secondRule.evaluate(any(CorrelationContext.class)))
+                .thenReturn(0.35);
+
+        CorrelationResult result = multiRuleEngine.correlate(alert);
+
+        assertEquals(CorrelationAction.ATTACHED_TO_INCIDENT, result.action());
+        assertEquals(80L, result.incidentId());
+        assertEquals(0.75, result.score(), 0.000001);
+
+        verify(incidentAlertService).attachAlert(80L, 6L, 0.75);
+        verify(incidentService, never()).createIncident(any());
+    }
+
+    @Test
+    void shouldCreateNewIncidentWhenCandidateHasNoRelatedAlerts() {
+        Alert alert = createAlert(7L, "CPU_HIGH", "order-service");
+        Incident candidate = createIncident(90L);
+
+        when(incidentRepository
+                .findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                        eq(IncidentStatus.OPEN),
+                        eq(AlertEnvironment.PRODUCTION),
+                        any(LocalDateTime.class)
+                ))
+                .thenReturn(List.of(candidate));
+
+        when(incidentAlertService.findAlertsByIncidentId(90L))
+                .thenReturn(List.of());
+
+        when(correlationRule.evaluate(any(CorrelationContext.class)))
+                .thenReturn(0.40);
+
+        Incident createdIncident = createIncident(100L);
+
+        when(incidentService.createIncident(any(CreateIncidentCommand.class)))
+                .thenReturn(createdIncident);
+
+        CorrelationResult result = engine.correlate(alert);
+
+        assertEquals(CorrelationAction.NEW_INCIDENT, result.action());
+        assertEquals(100L, result.incidentId());
+        assertEquals(0.0, result.score());
+
+        verify(incidentService).createIncident(any(CreateIncidentCommand.class));
+        verify(incidentAlertService).attachAlert(100L, 7L, 0.0);
+        verify(incidentAlertService, never()).attachAlert(90L, 7L, 0.40);
+    }
+
 
     private Alert createAlert(Long id, String type, String service) {
         Alert alert = new Alert();
