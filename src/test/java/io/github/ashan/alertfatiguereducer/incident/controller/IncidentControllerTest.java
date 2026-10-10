@@ -6,10 +6,13 @@ import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentRespons
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentSeverity;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
+import io.github.ashan.alertfatiguereducer.shared.config.PaginationConfig;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -19,13 +22,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(IncidentController.class)
+@Import(PaginationConfig.class)
 class IncidentControllerTest {
 
     @Autowired
@@ -137,6 +143,31 @@ class IncidentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].environment").value("PRODUCTION"));
+    }
+
+    @Test
+    void shouldLimitMaximumPageSizeTo100() throws Exception {
+        when(incidentService.getAllIncidents(
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/v1/incidents")
+                        .param("page", "0")
+                        .param("size", "150"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+
+        verify(incidentService).getAllIncidents(
+                isNull(),
+                isNull(),
+                pageableCaptor.capture()
+        );
+
+        assertEquals(100, pageableCaptor.getValue().getPageSize());
     }
 
     private IncidentResponse createIncidentResponse() {
