@@ -9,6 +9,8 @@ import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepositor
 import io.github.ashan.alertfatiguereducer.incident.specification.IncidentSpecification;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,12 +67,14 @@ public class IncidentService {
     }
 
     @Transactional(readOnly = true)
-    public List<IncidentResponse> getAllIncidents(
+    public Page<IncidentResponse> getAllIncidents(
             IncidentStatus status,
-            AlertEnvironment environment
+            AlertEnvironment environment,
+            Pageable pageable
     ) {
-        Specification<Incident> specification = (root, query, criteriaBuilder) ->
-                criteriaBuilder.conjunction();
+        Specification<Incident> specification =
+                (root, query, criteriaBuilder) ->
+                        criteriaBuilder.conjunction();
 
         if (status != null) {
             specification = specification.and(
@@ -84,9 +88,7 @@ public class IncidentService {
             );
         }
 
-        return incidentRepository.findAll(specification)
-                .stream()
-                .map(incidentMapper::toResponse)
-                .toList();
+        return incidentRepository.findAll(specification, pageable)
+                .map(incidentMapper::toResponse);
     }
 }

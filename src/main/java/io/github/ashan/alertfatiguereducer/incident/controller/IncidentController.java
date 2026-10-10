@@ -6,6 +6,10 @@ import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,12 +33,17 @@ public class IncidentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<IncidentResponse>> getAllIncidents(
+    public ResponseEntity<Page<IncidentResponse>> getAllIncidents(
             @RequestParam(required = false) IncidentStatus status,
-            @RequestParam(required = false) AlertEnvironment environment
+            @RequestParam(required = false) AlertEnvironment environment,
+            @PageableDefault(
+                    size = 20,
+                    sort = "lastUpdatedAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
     ) {
-        List<IncidentResponse> incidents =
-                incidentService.getAllIncidents(status, environment);
+        Page<IncidentResponse> incidents =
+                incidentService.getAllIncidents(status, environment, pageable);
 
         return ResponseEntity.ok(incidents);
     }

@@ -13,6 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
@@ -135,114 +139,100 @@ class IncidentServiceTest {
         mockFilteredIncidents(List.of(incident));
 
         IncidentResponse response = new IncidentResponse(
-                1L,
-                "High CPU usage",
-                "order-service",
-                AlertEnvironment.PRODUCTION,
-                IncidentSeverity.WARNING,
-                IncidentStatus.OPEN,
-                null,
-                null,
-                null
+                1L, "High CPU usage", "order-service",
+                AlertEnvironment.PRODUCTION, IncidentSeverity.WARNING,
+                IncidentStatus.OPEN, null, null, null
         );
 
         when(incidentMapper.toResponse(incident)).thenReturn(response);
 
-        List<IncidentResponse> result =
-                incidentService.getAllIncidents(null, null);
-
-        assertEquals(1, result.size());
-        assertEquals("order-service", result.get(0).service());
-
-        verify(incidentRepository).findAll(
-                org.mockito.ArgumentMatchers
-                        .<Specification<Incident>>any()
-        );
-    }
-
-    @Test
-    void shouldFilterIncidentsByStatus() {
-        Incident incident = new Incident();
-        incident.setId(1L);
-        incident.setTitle("High CPU usage");
-        incident.setService("order-service");
-        incident.setEnvironment(AlertEnvironment.PRODUCTION);
-        incident.setSeverity(IncidentSeverity.WARNING);
-        incident.setStatus(IncidentStatus.OPEN);
-
-        mockFilteredIncidents(List.of(incident));
-
-        IncidentResponse response = new IncidentResponse(
-                1L,
-                "High CPU usage",
-                "order-service",
-                AlertEnvironment.PRODUCTION,
-                IncidentSeverity.WARNING,
-                IncidentStatus.OPEN,
-                null,
-                null,
-                null
+        Page<IncidentResponse> result = incidentService.getAllIncidents(
+                null, null, PageRequest.of(0, 20)
         );
 
-        when(incidentMapper.toResponse(incident)).thenReturn(response);
-
-        List<IncidentResponse> result =
-                incidentService.getAllIncidents(IncidentStatus.OPEN, null);
-
-        assertEquals(1, result.size());
-        assertEquals(IncidentStatus.OPEN, result.get(0).status());
+        assertEquals(1, result.getContent().size());
+        assertEquals("order-service", result.getContent().get(0).service());
+        assertEquals(1, result.getTotalElements());
 
         verify(incidentRepository).findAll(
-                org.mockito.ArgumentMatchers
-                        .<Specification<Incident>>argThat(spec -> spec != null)
+                org.mockito.ArgumentMatchers.<Specification<Incident>>any(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)
         );
     }
 
     @Test
     void shouldFilterIncidentsByEnvironment() {
-        Incident incident = new Incident();
-        incident.setId(1L);
-        incident.setTitle("High CPU usage");
-        incident.setService("order-service");
-        incident.setEnvironment(AlertEnvironment.PRODUCTION);
-        incident.setSeverity(IncidentSeverity.WARNING);
-        incident.setStatus(IncidentStatus.OPEN);
-
+        Incident incident = createTestIncident();
         mockFilteredIncidents(List.of(incident));
 
-        IncidentResponse response = new IncidentResponse(
-                1L,
-                "High CPU usage",
-                "order-service",
-                AlertEnvironment.PRODUCTION,
-                IncidentSeverity.WARNING,
-                IncidentStatus.OPEN,
-                null,
-                null,
-                null
-        );
-
+        IncidentResponse response = createTestIncidentResponse();
         when(incidentMapper.toResponse(incident)).thenReturn(response);
 
-        List<IncidentResponse> result =
-                incidentService.getAllIncidents(
-                        null, AlertEnvironment.PRODUCTION
-                );
+        Page<IncidentResponse> result = incidentService.getAllIncidents(
+                null, AlertEnvironment.PRODUCTION, PageRequest.of(0, 20)
+        );
 
-        assertEquals(1, result.size());
+        assertEquals(1, result.getContent().size());
         assertEquals(
                 AlertEnvironment.PRODUCTION,
-                result.get(0).environment()
+                result.getContent().get(0).environment()
         );
 
         verify(incidentRepository).findAll(
-                org.mockito.ArgumentMatchers
-                        .<Specification<Incident>>argThat(spec -> spec != null)
+                org.mockito.ArgumentMatchers.<Specification<Incident>>any(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)
+        );
+    }
+
+    @Test
+    void shouldFilterIncidentsByStatus() {
+        Incident incident = createTestIncident();
+        mockFilteredIncidents(List.of(incident));
+
+        IncidentResponse response = createTestIncidentResponse();
+        when(incidentMapper.toResponse(incident)).thenReturn(response);
+
+        Page<IncidentResponse> result = incidentService.getAllIncidents(
+                IncidentStatus.OPEN, null, PageRequest.of(0, 20)
+        );
+
+        assertEquals(1, result.getContent().size());
+        assertEquals(IncidentStatus.OPEN, result.getContent().get(0).status());
+
+        verify(incidentRepository).findAll(
+                org.mockito.ArgumentMatchers.<Specification<Incident>>any(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)
         );
     }
 
     @Test
     void shouldFilterIncidentsByStatusAndEnvironment() {
+        Incident incident = createTestIncident();
+        mockFilteredIncidents(List.of(incident));
+
+        IncidentResponse response = createTestIncidentResponse();
+        when(incidentMapper.toResponse(incident)).thenReturn(response);
+
+        Page<IncidentResponse> result = incidentService.getAllIncidents(
+                IncidentStatus.OPEN,
+                AlertEnvironment.PRODUCTION,
+                PageRequest.of(0, 20)
+        );
+
+        assertEquals(1, result.getContent().size());
+        assertEquals(IncidentStatus.OPEN, result.getContent().get(0).status());
+        assertEquals(
+                AlertEnvironment.PRODUCTION,
+                result.getContent().get(0).environment()
+        );
+
+        verify(incidentRepository).findAll(
+                org.mockito.ArgumentMatchers.<Specification<Incident>>any(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)
+        );
+    }
+
+    private Incident createTestIncident() {
         Incident incident = new Incident();
         incident.setId(1L);
         incident.setTitle("High CPU usage");
@@ -250,10 +240,11 @@ class IncidentServiceTest {
         incident.setEnvironment(AlertEnvironment.PRODUCTION);
         incident.setSeverity(IncidentSeverity.WARNING);
         incident.setStatus(IncidentStatus.OPEN);
+        return incident;
+    }
 
-        mockFilteredIncidents(List.of(incident));
-
-        IncidentResponse response = new IncidentResponse(
+    private IncidentResponse createTestIncidentResponse() {
+        return new IncidentResponse(
                 1L,
                 "High CPU usage",
                 "order-service",
@@ -264,32 +255,12 @@ class IncidentServiceTest {
                 null,
                 null
         );
-
-        when(incidentMapper.toResponse(incident)).thenReturn(response);
-
-        List<IncidentResponse> result =
-                incidentService.getAllIncidents(
-                        IncidentStatus.OPEN,
-                        AlertEnvironment.PRODUCTION
-                );
-
-        assertEquals(1, result.size());
-        assertEquals(IncidentStatus.OPEN, result.get(0).status());
-        assertEquals(
-                AlertEnvironment.PRODUCTION,
-                result.get(0).environment()
-        );
-
-        verify(incidentRepository).findAll(
-                org.mockito.ArgumentMatchers
-                        .<Specification<Incident>>argThat(spec -> spec != null)
-        );
     }
-
     private void mockFilteredIncidents(List<Incident> incidents) {
         when(incidentRepository.findAll(
                 org.mockito.ArgumentMatchers
-                        .<Specification<Incident>>any()
-        )).thenReturn(incidents);
+                        .<Specification<Incident>>any(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)
+        )).thenReturn(new PageImpl<>(incidents));
     }
 }
