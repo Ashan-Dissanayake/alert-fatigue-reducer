@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -182,5 +184,63 @@ class IncidentControllerTest {
                 LocalDateTime.of(2026, 10, 10, 8, 5),
                 0.75
         );
+    }
+
+    @Test
+    void shouldUseDefaultSortingWhenSortParameterIsNotProvided() throws Exception {
+        when(incidentService.getAllIncidents(
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/v1/incidents"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+
+        verify(incidentService).getAllIncidents(
+                isNull(),
+                isNull(),
+                pageableCaptor.capture()
+        );
+
+        Pageable pageable = pageableCaptor.getValue();
+
+        assertEquals("lastUpdatedAt", pageable.getSort().iterator().next().getProperty());
+        assertEquals(
+                Sort.Direction.DESC,
+                pageable.getSort().iterator().next().getDirection()
+        );
+    }
+
+    @Test
+    void shouldUseCustomSortingWhenSortParameterIsProvided() throws Exception {
+        when(incidentService.getAllIncidents(
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/v1/incidents")
+                        .param("sort", "severity,asc"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+
+        verify(incidentService).getAllIncidents(
+                isNull(),
+                isNull(),
+                pageableCaptor.capture()
+        );
+
+        Sort.Order order = pageableCaptor.getValue()
+                .getSort()
+                .getOrderFor("severity");
+
+        assertNotNull(order);
+        assertEquals(Sort.Direction.ASC, order.getDirection());
     }
 }
