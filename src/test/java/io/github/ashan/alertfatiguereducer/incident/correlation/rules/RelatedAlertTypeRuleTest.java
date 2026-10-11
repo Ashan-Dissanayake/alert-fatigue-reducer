@@ -101,6 +101,50 @@ class RelatedAlertTypeRuleTest {
         assertEquals(0.0, rule.evaluate(context));
     }
 
+
+    @Test
+    void shouldReturnScoreWhenCpuHighIsRelatedToLatencyHigh() {
+        Alert incomingAlert = createAlert("CPU_HIGH");
+        Alert relatedAlert = createAlert("LATENCY_HIGH");
+
+        CorrelationContext context = new CorrelationContext(
+                incomingAlert,
+                null,
+                List.of(relatedAlert)
+        );
+
+        assertEquals(0.30, rule.evaluate(context));
+    }
+
+    @Test
+    void shouldReturnScoreWhenErrorRateHighIsRelatedToTimeout() {
+        Alert incomingAlert = createAlert("ERROR_RATE_HIGH");
+        Alert relatedAlert = createAlert("TIMEOUT");
+
+        CorrelationContext context = new CorrelationContext(
+                incomingAlert,
+                null,
+                List.of(relatedAlert)
+        );
+
+        assertEquals(0.30, rule.evaluate(context));
+    }
+
+    @Test
+    void shouldReturnScoreWhenTimeoutIsRelatedToErrorRateHigh() {
+        Alert incomingAlert = createAlert("TIMEOUT");
+        Alert relatedAlert = createAlert("ERROR_RATE_HIGH");
+
+        CorrelationContext context = new CorrelationContext(
+                incomingAlert,
+                null,
+                List.of(relatedAlert)
+        );
+
+        assertEquals(0.30, rule.evaluate(context));
+    }
+
+
     private Alert createAlert(String type) {
         Alert alert = new Alert();
         alert.setType(type);
