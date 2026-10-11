@@ -367,6 +367,38 @@ class DefaultAlertCorrelationEngineTest {
                 .attachAlert(anyLong(), anyLong(), anyDouble());
     }
 
+    @Test
+    void shouldCreateNewIncidentWhenCandidateScoreIsJustBelowThreshold() {
+        Alert alert = createAlert(1L, "CPU_HIGH", "payment-service");
+        Incident candidate = createIncident(70L);
+
+        when(incidentRepository.findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.PRODUCTION),
+                any(LocalDateTime.class)
+        )).thenReturn(List.of(candidate));
+
+        when(incidentAlertService.findAlertsByIncidentId(70L))
+                .thenReturn(List.of());
+
+        when(correlationRule.evaluate(any(CorrelationContext.class)))
+                .thenReturn(0.69);
+
+        Incident newIncident = createIncident(71L);
+
+        when(incidentService.createIncident(any(CreateIncidentCommand.class)))
+                .thenReturn(newIncident);
+
+        CorrelationResult result = engine.correlate(alert);
+
+        assertEquals(CorrelationAction.NEW_INCIDENT, result.action());
+        assertEquals(71L, result.incidentId());
+
+        verify(incidentAlertService).attachAlert(71L, 1L, 0.0);
+        verify(incidentAlertService, never())
+                .attachAlert(eq(70L), eq(1L), anyDouble());
+    }
+
 
     private Alert createAlert(Long id, String type, String service) {
         Alert alert = new Alert();

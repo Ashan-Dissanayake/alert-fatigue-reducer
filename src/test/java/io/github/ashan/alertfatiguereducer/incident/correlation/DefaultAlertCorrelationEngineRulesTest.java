@@ -104,4 +104,6 @@ class DefaultAlertCorrelationEngineRulesTest {
         verify(incidentAlertService)
                 .attachAlert(50L, 2L, 1.00);
     }
+
+
 }
