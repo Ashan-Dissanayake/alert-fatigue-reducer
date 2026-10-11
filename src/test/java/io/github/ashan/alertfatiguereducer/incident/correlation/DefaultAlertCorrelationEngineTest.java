@@ -321,6 +321,31 @@ class DefaultAlertCorrelationEngineTest {
         );
     }
 
+
+    @Test
+    void shouldSearchOnlyOpenIncidentsForCorrelation() {
+        Alert alert = createAlert(1L, "CPU_HIGH", "payment-service");
+
+        when(incidentRepository.findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.PRODUCTION),
+                any(LocalDateTime.class)
+        )).thenReturn(List.of());
+
+        Incident createdIncident = createIncident(91L);
+        when(incidentService.createIncident(any(CreateIncidentCommand.class)))
+                .thenReturn(createdIncident);
+
+        engine.correlate(alert);
+
+        verify(incidentRepository).findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.PRODUCTION),
+                any(LocalDateTime.class)
+        );
+    }
+
+
     private Alert createAlert(Long id, String type, String service) {
         Alert alert = new Alert();
         alert.setId(id);
