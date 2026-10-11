@@ -399,6 +399,37 @@ class DefaultAlertCorrelationEngineTest {
                 .attachAlert(eq(70L), eq(1L), anyDouble());
     }
 
+    @Test
+    void shouldChooseHighestScoreWhenSomeCandidatesAreBelowThreshold() {
+        Alert alert = createAlert(100L, "LATENCY_HIGH", "payment-service");
+
+        Incident candidate1 = createIncident(1L);
+        Incident candidate2 = createIncident(2L);
+        Incident candidate3 = createIncident(3L);
+
+        when(incidentRepository.findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.PRODUCTION),
+                any(LocalDateTime.class)
+        )).thenReturn(List.of(candidate1, candidate2, candidate3));
+
+        when(incidentAlertService.findAlertsByIncidentId(1L)).thenReturn(List.of());
+        when(incidentAlertService.findAlertsByIncidentId(2L)).thenReturn(List.of());
+        when(incidentAlertService.findAlertsByIncidentId(3L)).thenReturn(List.of());
+
+        when(correlationRule.evaluate(any(CorrelationContext.class)))
+                .thenReturn(0.60, 0.85, 0.69);
+
+        CorrelationResult result = engine.correlate(alert);
+
+        assertEquals(CorrelationAction.ATTACHED_TO_INCIDENT, result.action());
+        assertEquals(2L, result.incidentId());
+        assertEquals(0.85, result.score());
+
+        verify(incidentAlertService).attachAlert(2L, 100L, 0.85);
+        verify(incidentService, never()).createIncident(any());
+    }
+
 
     private Alert createAlert(Long id, String type, String service) {
         Alert alert = new Alert();
