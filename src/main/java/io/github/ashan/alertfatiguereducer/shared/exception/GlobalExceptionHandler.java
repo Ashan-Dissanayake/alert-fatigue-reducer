@@ -22,4 +22,16 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
+
+    @ExceptionHandler(IncidentNotOpenException.class)
+    public ResponseEntity<Map<String, String>> handleIncidentNotOpen(
+            IncidentNotOpenException exception) {
+
+        Map<String, String> body = Map.of(
+                "error", "Incident Not Open",
+                "message", exception.getMessage()
+        );
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
 }

@@ -6,11 +6,13 @@ import io.github.ashan.alertfatiguereducer.alert.repository.AlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentAlert;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentSeverity;
+import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentAlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepository;
 import io.github.ashan.alertfatiguereducer.shared.exception.AlertAlreadyAssociatedException;
 import io.github.ashan.alertfatiguereducer.shared.exception.AlertNotFoundException;
 import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotFoundException;
+import io.github.ashan.alertfatiguereducer.shared.exception.IncidentNotOpenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,10 @@ public class IncidentAlertService {
 
         Incident incident = incidentRepository.findById(incidentId)
                 .orElseThrow(() -> new IncidentNotFoundException(incidentId));
+
+        if (incident.getStatus() != IncidentStatus.OPEN) {
+            throw new IncidentNotOpenException(incidentId);
+        }
 
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new AlertNotFoundException(alertId));
