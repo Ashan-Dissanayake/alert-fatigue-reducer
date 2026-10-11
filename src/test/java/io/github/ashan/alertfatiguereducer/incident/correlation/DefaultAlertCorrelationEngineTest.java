@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -343,6 +344,27 @@ class DefaultAlertCorrelationEngineTest {
                 eq(AlertEnvironment.PRODUCTION),
                 any(LocalDateTime.class)
         );
+    }
+
+
+
+    @Test
+    void shouldNotAttachAlertWhenIncidentCreationFails() {
+        Alert alert = createAlert(1L, "CPU_HIGH", "payment-service");
+
+        when(incidentRepository.findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.PRODUCTION),
+                any(LocalDateTime.class)
+        )).thenReturn(List.of());
+
+        when(incidentService.createIncident(any(CreateIncidentCommand.class)))
+                .thenThrow(new RuntimeException("Incident creation failed"));
+
+        assertThrows(RuntimeException.class, () -> engine.correlate(alert));
+
+        verify(incidentAlertService, never())
+                .attachAlert(anyLong(), anyLong(), anyDouble());
     }
 
 
