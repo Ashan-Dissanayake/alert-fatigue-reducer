@@ -293,6 +293,33 @@ class DefaultAlertCorrelationEngineTest {
         verify(incidentAlertService, never()).attachAlert(90L, 7L, 0.40);
     }
 
+    @Test
+    void shouldSearchCandidatesOnlyInIncomingAlertEnvironment() {
+        LocalDateTime timestamp = LocalDateTime.of(2026, 10, 10, 10, 30);
+        Alert alert = createAlert(1L, "CPU_HIGH", "payment-service");
+        alert.setTimestamp(timestamp);
+        alert.setEnvironment(AlertEnvironment.STAGING);
+
+        when(incidentRepository.findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.STAGING),
+                eq(timestamp.minusMinutes(10))
+        )).thenReturn(List.of());
+
+        Incident createdIncident = createIncident(90L);
+        when(incidentService.createIncident(any(CreateIncidentCommand.class)))
+                .thenReturn(createdIncident);
+
+        CorrelationResult result = engine.correlate(alert);
+
+        assertEquals(CorrelationAction.NEW_INCIDENT, result.action());
+
+        verify(incidentRepository).findByStatusAndEnvironmentAndLastUpdatedAtAfter(
+                IncidentStatus.OPEN,
+                AlertEnvironment.STAGING,
+                timestamp.minusMinutes(10)
+        );
+    }
 
     private Alert createAlert(Long id, String type, String service) {
         Alert alert = new Alert();
