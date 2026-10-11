@@ -45,4 +45,20 @@ class SameEnvironmentRuleTest {
 
         assertEquals(0.0, rule.evaluate(new CorrelationContext(alert, incident, List.of())));
     }
+
+
+    @Test
+    void shouldReturnZeroWhenIncidentEnvironmentIsNull() {
+        Alert alert = new Alert();
+        alert.setEnvironment(AlertEnvironment.PRODUCTION);
+
+        Incident incident = new Incident();
+        incident.setEnvironment(null);
+
+        assertEquals(
+                0.0,
+                rule.evaluate(new CorrelationContext(alert, incident, List.of()))
+        );
+    }
+
 }
