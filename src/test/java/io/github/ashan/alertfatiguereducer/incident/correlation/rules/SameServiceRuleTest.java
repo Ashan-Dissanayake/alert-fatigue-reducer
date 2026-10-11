@@ -44,4 +44,18 @@ class SameServiceRuleTest {
 
         assertEquals(0.0, rule.evaluate(new CorrelationContext(alert, incident, List.of())));
     }
+
+    @Test
+    void shouldReturnZeroWhenIncidentServiceIsNull() {
+        Alert alert = new Alert();
+        alert.setService("order-service");
+
+        Incident incident = new Incident();
+        incident.setService(null);
+
+        assertEquals(
+                0.0,
+                rule.evaluate(new CorrelationContext(alert, incident, List.of()))
+        );
+    }
 }
