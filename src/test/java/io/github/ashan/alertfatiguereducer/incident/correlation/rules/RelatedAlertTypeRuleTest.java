@@ -87,6 +87,20 @@ class RelatedAlertTypeRuleTest {
         assertEquals(0.0, rule.evaluate(context));
     }
 
+    @Test
+    void shouldReturnZeroWhenIncomingAlertTypeIsNull() {
+        Alert incomingAlert = createAlert(null);
+        Alert existingAlert = createAlert("LATENCY_HIGH");
+
+        CorrelationContext context = new CorrelationContext(
+                incomingAlert,
+                null,
+                List.of(existingAlert)
+        );
+
+        assertEquals(0.0, rule.evaluate(context));
+    }
+
     private Alert createAlert(String type) {
         Alert alert = new Alert();
         alert.setType(type);
