@@ -7,6 +7,7 @@ import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertSeverity;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertSource;
 import io.github.ashan.alertfatiguereducer.alert.service.AlertService;
+import io.github.ashan.alertfatiguereducer.alert.validation.FiniteNumberValidator;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationAction;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -271,5 +273,39 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.message").exists());
 
         verifyNoInteractions(alertService);
+    }
+
+    @Test
+    void shouldRejectNonFiniteValue() throws Exception {
+
+        String request = """
+            {
+              "source": "CUSTOM",
+              "service": "order-service",
+              "environment": "PRODUCTION",
+              "type": "CPU_HIGH",
+              "severity": "WARNING",
+              "timestamp": "2026-10-08T09:31:00",
+              "value": NaN
+            }
+            """;
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(alertService);
+    }
+
+    @Test
+    void shouldRejectNonFiniteNumbers() {
+        FiniteNumberValidator validator = new FiniteNumberValidator();
+
+        assertThat(validator.isValid(Double.NaN, null)).isFalse();
+        assertThat(validator.isValid(Double.POSITIVE_INFINITY, null)).isFalse();
+        assertThat(validator.isValid(Double.NEGATIVE_INFINITY, null)).isFalse();
+        assertThat(validator.isValid(95.0, null)).isTrue();
+        assertThat(validator.isValid(null, null)).isTrue();
     }
 }
