@@ -1,13 +1,11 @@
 package io.github.ashan.alertfatiguereducer;
 
+import io.github.ashan.alertfatiguereducer.integration.AbstractPostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class AlertFatigueReducerApplicationTests {
+class AlertFatigueReducerApplicationTests extends AbstractPostgresIntegrationTest {
 
     @Test
     void contextLoads() {
     }
-
 }
