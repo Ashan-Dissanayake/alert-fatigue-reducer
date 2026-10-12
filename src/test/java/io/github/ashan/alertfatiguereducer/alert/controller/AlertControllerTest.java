@@ -116,9 +116,15 @@ class AlertControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation Failed"))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("service")));
 
         verifyNoInteractions(alertService);
+
+
     }
 
     @Test
@@ -186,7 +192,11 @@ class AlertControllerTest {
         mockMvc.perform(post("/api/v1/alerts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation Failed"))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("timestamp")));
 
         verifyNoInteractions(alertService);
     }
@@ -235,6 +245,30 @@ class AlertControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(alertService);
+    }
+
+    @Test
+    void shouldReturnConsistentErrorForInvalidSeverity() throws Exception {
+
+        String request = """
+            {
+              "source": "CUSTOM",
+              "service": "order-service",
+              "environment": "PRODUCTION",
+              "type": "CPU_HIGH",
+              "severity": "URGENT",
+              "timestamp": "2026-10-08T09:31:00"
+            }
+            """;
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid Request"))
+                .andExpect(jsonPath("$.message").exists());
 
         verifyNoInteractions(alertService);
     }
