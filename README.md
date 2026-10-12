@@ -1,30 +1,33 @@
 # Alert Fatigue Reducer
 
-A rule-based alert correlation system that groups related monitoring alerts into incidents, helping reduce alert noise and making incident investigation easier.
+A rule-based alert correlation system that groups related monitoring alerts into incidents, reducing alert noise and making incident investigation easier.
 
 ## Problem
 
-Production monitoring systems can generate multiple alerts from the same operational event. When these alerts are handled independently, responders may face unnecessary alert noise, duplicate investigations, and difficulty identifying related failures.
+Production monitoring systems can generate multiple alerts from the same operational event. When these alerts are handled independently, responders face unnecessary alert noise, duplicate investigations, and difficulty identifying related failures.
 
 ## Solution
 
-Alert Fatigue Reducer correlates incoming alerts using an explainable, rule-based scoring engine. It evaluates relationships between alerts and existing incidents, then attaches an alert to the best-matching open incident or creates a new incident when no candidate meets the correlation threshold.
+Alert Fatigue Reducer correlates incoming alerts using an explainable, rule-based scoring engine. It evaluates incoming alerts against existing open incidents and either attaches the alert to the highest-scoring qualifying incident or creates a new incident when no candidate meets the correlation threshold.
 
-The correlation score represents the strength of the rule-based match, **not the probability that an incident's root cause has been identified**.
+The correlation score represents the strength of a rule-based match, **not the probability that an incident's root cause has been identified**.
 
-## Current Features
+## Features
 
 - **Rule-based alert correlation** using service, environment, alert-type relationships, and time proximity.
-- **Weighted correlation scoring** with a configurable decision threshold.
+- **Weighted correlation scoring** with a decision threshold.
 - **Incident creation and alert association** when no existing incident meets the threshold.
 - **Incident severity escalation** when a more severe alert is associated with an incident.
 - **Incident lifecycle management** with `OPEN` and `RESOLVED` states.
 - **Incident filtering** by status and environment.
-- **Pagination and sorting** with an allowlist of supported sort fields and a maximum page size.
+- **Pagination and sorting** with supported sort-field validation and a maximum page size of 100.
 - **Request validation** for required fields, supported alert types, timestamps, and finite numeric metric values.
 - **Consistent API error responses** for validation failures and supported incident exceptions.
+- **HTTP Basic authentication** for API endpoints, with public health and info endpoints.
 - **Database migrations** managed through Flyway.
-- **Automated testing**, including unit tests, controller tests, correlation-rule tests, and PostgreSQL integration tests using Testcontainers.
+- **API documentation** through Swagger UI and OpenAPI.
+- **Application monitoring** through Spring Boot Actuator.
+- **Automated tests**, including unit tests, controller tests, correlation-rule tests, and PostgreSQL integration tests using Testcontainers.
 
 ## Technology Stack
 
@@ -32,18 +35,22 @@ The correlation score represents the strength of the rule-based match, **not the
 |---|---|
 | Java 17 | Application runtime |
 | Spring Boot | REST API and application framework |
+| Spring Web MVC | HTTP endpoints |
 | Spring Data JPA | Persistence and database access |
+| Spring Security | HTTP Basic authentication |
 | PostgreSQL | Relational database |
 | Flyway | Versioned database migrations |
 | Jakarta Bean Validation | Request validation |
+| Spring Boot Actuator | Health and application information endpoints |
+| Springdoc OpenAPI | API documentation |
 | JUnit 5 and Mockito | Automated testing |
-| Spring Boot Test / MockMvc | API and application testing |
+| MockMvc | Controller and API testing |
 | Testcontainers | PostgreSQL integration testing |
 | Maven | Build and dependency management |
 
 ## Architecture
 
-The backend follows a feature-oriented modular monolith structure. Responsibilities are separated into API controllers, application services, persistence components, correlation rules, and shared exception handling.
+The backend follows a **feature-oriented modular monolith** architecture. Application responsibilities are separated into REST controllers, application services, repositories, correlation rules, and shared configuration and exception handling.
 
 ```mermaid
 flowchart TD
@@ -54,32 +61,41 @@ flowchart TD
     D --> F[Correlation Engine]
     F --> G[Correlation Rules]
     F --> H[Incident Service]
-    H --> I[(PostgreSQL)]
-    E --> I
-    F --> J[Incident Alert Service]
-    J --> I
+    F --> I[Incident Alert Service]
+    H --> J[(PostgreSQL)]
+    E --> J
+    I --> J
     K[Incident REST API] --> H
-    L[Flyway Migrations] --> I
+    L[Flyway Migrations] --> J
 ```
 
-### Correlation Rules
+### Alert Correlation
 
-The engine evaluates several signals:
+The correlation engine evaluates these signals:
 
-- **Same service:** alerts originating from the same service.
-- **Same environment:** alerts belonging to the same deployment environment.
-- **Related alert types:** predefined relationships between alert types.
-- **Time proximity:** alerts occurring close together in time.
+- **Same service:** Whether alerts originate from the same service.
+- **Same environment:** Whether alerts belong to the same deployment environment.
+- **Related alert types:** Whether the alert types have a predefined relationship.
+- **Time proximity:** Whether alerts occur within the candidate time window.
 
-The individual rule scores are combined and compared against the correlation threshold. Among qualifying candidates, the engine selects the highest-scoring candidate.
+The individual rule scores are combined and compared with the correlation threshold. Among qualifying candidates, the engine selects the highest-scoring incident.
 
-The current implementation uses a 10-minute candidate window and a correlation threshold of `0.70`.
+Current correlation settings:
 
-## API
+| Setting | Value |
+|---|---|
+| Candidate time window | 10 minutes |
+| Correlation threshold | `0.70` |
+
+The scoring mechanism is deterministic and rule-based. It does not perform machine-learning-based root-cause analysis.
+
+## API Reference
 
 Base URL: `http://localhost:8080`
 
-### Create an alert
+API requests require HTTP Basic authentication. Configure the application credentials before making authenticated requests.
+
+### Create an Alert
 
 `POST /api/v1/alerts`
 
@@ -102,25 +118,30 @@ Example request:
 
 The response includes the created alert and its correlation outcome, including the correlation action, incident ID, and correlation score.
 
-Possible correlation actions include `NEW_INCIDENT` and `ATTACHED_TO_INCIDENT`.
+Possible correlation actions include:
 
-### Retrieve an incident
+- `NEW_INCIDENT`
+- `ATTACHED_TO_INCIDENT`
+
+### Retrieve an Incident
 
 `GET /api/v1/incidents/{incidentId}`
 
-Returns an incident by ID.
+Retrieves an incident by its ID.
 
-### List incidents
+### List Incidents
 
 `GET /api/v1/incidents`
 
-Optional query parameters:
+Supported query parameters:
 
-- `status` — `OPEN` or `RESOLVED`
-- `environment` — `DEVELOPMENT`, `STAGING`, or `PRODUCTION`
-- `page` — zero-based page index
-- `size` — page size, up to 100
-- `sort` — an allowed incident field and direction
+| Parameter | Description |
+|---|---|
+| `status` | Filter by `OPEN` or `RESOLVED` |
+| `environment` | Filter by `DEVELOPMENT`, `STAGING`, or `PRODUCTION` |
+| `page` | Zero-based page index |
+| `size` | Page size, up to 100 |
+| `sort` | An allowed incident field and sort direction |
 
 Example:
 
@@ -128,54 +149,103 @@ Example:
 GET /api/v1/incidents?status=OPEN&environment=PRODUCTION&page=0&size=20&sort=lastUpdatedAt,desc
 ```
 
-### Resolve an incident
+### API Documentation
 
-The incident service supports resolving incidents. A public resolve endpoint is not currently documented because it should only be listed after its controller route is verified.
+When the application is running:
+
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- OpenAPI specification: `http://localhost:8080/v3/api-docs`
+
+These endpoints are protected by authentication under the current security configuration.
+
+### Health and Application Information
+
+- Health: `GET /actuator/health`
+- Application information: `GET /actuator/info`
+
+These endpoints are publicly accessible under the current security configuration. The health endpoint is configured not to expose component details.
 
 ## Getting Started
 
 ### Prerequisites
 
 - JDK 17
-- Docker
+- PostgreSQL
+- Docker, for Testcontainers integration tests
+- Git
 - Maven Wrapper included in the repository
-- PostgreSQL for local application execution
 
-### Database configuration
+### 1. Clone the Repository
 
-Configure the PostgreSQL connection in `src/main/resources/application.properties` or provide equivalent external configuration.
+```bash
+git clone <repository-url>
+cd alert-fatigue-reducer
+```
 
-The current local configuration uses:
+Replace `<repository-url>` with the repository's Git URL.
+
+### 2. Configure the Database
+
+Create a PostgreSQL database named `alert_fatigue`, or configure the application to use an existing database.
+
+Configure the datasource URL, username, and password through `src/main/resources/application.properties` or equivalent external configuration.
+
+Example local datasource configuration:
 
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/alert_fatigue
-spring.datasource.username=postgres
-spring.datasource.password=1234
+spring.datasource.username=${DB_USERNAME}
+spring.datasource.password=${DB_PASSWORD}
+
 spring.jpa.hibernate.ddl-auto=validate
 spring.flyway.enabled=true
 ```
 
-Replace local credentials with your own configuration before using the application outside a local development environment.
+Set `DB_USERNAME` and `DB_PASSWORD` in your environment before starting the application.
 
-Flyway applies the versioned database migrations when the application starts.
+**Do not commit database credentials or production secrets to source control.**
 
-### Run the application
+Flyway applies versioned database migrations during application startup. Hibernate validates the schema rather than automatically creating or updating it.
 
-On Windows:
+### 3. Configure Application Security
+
+The application reads its HTTP Basic credentials from environment variables:
+
+```text
+APP_SECURITY_USERNAME
+APP_SECURITY_PASSWORD
+```
+
+Set both variables before starting the application. Use a strong, unique password and keep it out of Git.
+
+The configured password is encoded using BCrypt before it is stored in the in-memory user configuration. The current implementation provides a single in-memory administrative user; it does not implement persistent user management or a multi-user authorization model.
+
+For production deployment, expose authenticated endpoints only over HTTPS.
+
+### 4. Run the Application
+
+On Windows PowerShell:
 
 ```powershell
+$env:APP_SECURITY_USERNAME = "admin"
+$env:APP_SECURITY_PASSWORD = "<strong-local-password>"
+$env:DB_USERNAME = "postgres"
+$env:DB_PASSWORD = "<your-local-database-password>"
+
 .\mvnw.cmd spring-boot:run
 ```
 
-On Linux or macOS:
+Replace the example database credentials with your actual local PostgreSQL credentials. Do not use the example application credentials in production.
+
+On Linux or macOS, set the same environment variables using your shell or deployment configuration, then run:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-The API runs on port `8080` by default.
+The application runs on port `8080` by default.
 
-### Run tests
+### 5. Run Tests
 
 On Windows:
 
@@ -183,7 +253,7 @@ On Windows:
 .\mvnw.cmd test
 ```
 
-Run the full Maven verification lifecycle:
+Run the complete Maven verification lifecycle:
 
 ```powershell
 .\mvnw.cmd clean verify
@@ -191,16 +261,28 @@ Run the full Maven verification lifecycle:
 
 PostgreSQL integration tests use Testcontainers and require a working Docker environment.
 
+The current verified test suite contains **82 tests**, with all tests passing in the last successful `clean verify` run.
+
+## Security Notes
+
+- API endpoints require HTTP Basic authentication, except for the explicitly permitted Actuator health and info endpoints.
+- HTTP Basic credentials must be transmitted over HTTPS outside local development.
+- The configured user is stored in memory; credentials and users do not persist in the database.
+- CSRF protection is disabled for the stateless API security configuration.
+- Database and application secrets should be supplied through environment variables or a secret-management mechanism.
+
 ## Current Limitations
 
-- Correlation is rule-based; there is no machine-learning model or automated root-cause analysis.
+- Correlation uses predefined, explainable rules rather than machine learning.
 - Correlation rules and the decision threshold are predefined in the current implementation.
-- Alert ingestion is exposed through a REST API; external monitoring-platform integrations are not yet documented as implemented.
-- An Angular frontend and a complete deployment workflow are not described as completed features.
-- Authentication, authorization, notification delivery, and automatic remediation are outside the current documented MVP scope.
+- Alert ingestion is exposed through a REST API; external monitoring-platform integrations are not documented as implemented.
+- Persistent user management, fine-grained authorization, notification delivery, and automatic remediation are outside the current MVP scope.
+- A frontend and a complete production deployment workflow are not included in the documented backend scope.
 
 ## Project Status
 
-The backend MVP is under development, with alert correlation, incident management, API validation, database migrations, and automated tests implemented.
+The backend MVP implements alert ingestion, explainable alert correlation, incident management, validation, database migrations, authenticated API access, API documentation, and automated testing.
 
-The next priority is final regression testing, API documentation, and release-readiness verification.
+The latest verified build completed successfully with **82 tests passing**.
+
+The project is intended to demonstrate practical backend engineering concepts, including modular application design, rule-based decision logic, REST API development, persistence, security configuration, and automated integration testing.
