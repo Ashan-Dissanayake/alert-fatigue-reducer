@@ -6,8 +6,11 @@ import io.github.ashan.alertfatiguereducer.incident.dto.response.IncidentRespons
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentStatus;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
 import io.github.ashan.alertfatiguereducer.shared.config.AllowedIncidentSortFields;
+import io.github.ashan.alertfatiguereducer.shared.response.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +46,11 @@ public class IncidentController {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Incident not found"
+                    description = "Incident not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
             )
     })
     @GetMapping("/{incidentId}")
@@ -79,7 +86,11 @@ public class IncidentController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid filter, pagination, or unsupported sort field"
+                    description = "Invalid filter, pagination, or unsupported sort field",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
             )
     })
     @GetMapping
