@@ -1,32 +1,40 @@
-  name: CI
 
-  on:
-    push:
-      branches: [master, main]
-    pull_request:
-      branches: [master, main]
+name: CI
 
-  permissions:
-    contents: read
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
-  jobs:
-    build-and-test:
-      name: Build and Test
-      runs-on: ubuntu-latest
+permissions:
+  contents: read
 
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v4
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-        - name: Set up JDK 17
-          uses: actions/setup-java@v4
-          with:
-            distribution: temurin
-            java-version: '17'
-            cache: maven
+    env:
+      SPRING_PROFILES_ACTIVE: test
 
-        - name: Make Maven Wrapper executable
-          run: chmod +x mvnw
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-        - name: Build and run tests
-          run: ./mvnw --batch-mode --no-transfer-progress clean verify
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Verify Docker availability
+        run: docker info
+
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
+
+      - name: Build and run tests
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
