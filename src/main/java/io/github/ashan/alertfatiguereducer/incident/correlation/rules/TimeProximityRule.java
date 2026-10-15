@@ -7,12 +7,12 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+
 @Component
 public class TimeProximityRule implements CorrelationRule {
 
-    private static final double WITHIN_TWO_MINUTES = 0.25;
-    private static final double WITHIN_FIVE_MINUTES = 0.20;
-    private static final double WITHIN_TEN_MINUTES = 0.10;
+    private static final double MAX_SCORE = 0.25;
+    private static final double HALF_LIFE_MINUTES = 5.0;
 
     @Override
     public double evaluate(CorrelationContext context) {
@@ -26,22 +26,15 @@ public class TimeProximityRule implements CorrelationRule {
             return 0.0;
         }
 
-        long minutes = Math.abs(
-                Duration.between(incidentStartedAt, alertTimestamp).toMinutes()
+        double elapsedMinutes = Math.abs(
+                Duration.between(
+                        incidentStartedAt,
+                        alertTimestamp
+                ).toMillis() / 60_000.0
         );
 
-        if (minutes <= 2) {
-            return WITHIN_TWO_MINUTES;
-        }
+        double decayRate = Math.log(2.0) / HALF_LIFE_MINUTES;
 
-        if (minutes <= 5) {
-            return WITHIN_FIVE_MINUTES;
-        }
-
-        if (minutes <= 10) {
-            return WITHIN_TEN_MINUTES;
-        }
-
-        return 0.0;
+        return MAX_SCORE * Math.exp(-decayRate * elapsedMinutes);
     }
 }

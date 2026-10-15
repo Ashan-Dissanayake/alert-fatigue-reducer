@@ -92,17 +92,20 @@ class DefaultAlertCorrelationEngineRulesTest {
 
         CorrelationResult result = engine.correlate(incomingAlert);
 
+
         // Same service: 0.30
         // Same environment: 0.15
         // Related alert types: 0.30
-        // Within two minutes: 0.25
-        // Total: 1.00
+        // Exponential time decay after one minute: approximately 0.2176
+        // Total: approximately 0.9676
+
         assertEquals(CorrelationAction.ATTACHED_TO_INCIDENT, result.action());
         assertEquals(50L, result.incidentId());
-        assertEquals(1.00, result.score(), 0.000001);
+        assertEquals(0.967637640824031, result.score(), 0.000001);
 
         verify(incidentAlertService)
-                .attachAlert(50L, 2L, 1.00);
+                .attachAlert(50L, 2L, result.score());
+
     }
 
 

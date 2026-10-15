@@ -8,9 +8,13 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static junit.framework.TestCase.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+
 class TimeProximityRuleTest {
+
+    private static final double DELTA = 0.000001;
 
     private final TimeProximityRule rule = new TimeProximityRule();
 
@@ -24,27 +28,38 @@ class TimeProximityRuleTest {
         Incident incident = new Incident();
         incident.setStartedAt(baseTime);
 
-        return rule.evaluate(new CorrelationContext(alert, incident, List.of()));
+        return rule.evaluate(
+                new CorrelationContext(alert, incident, List.of())
+        );
     }
 
     @Test
-    void shouldReturnHighestScoreWithinTwoMinutes() {
-        assertEquals(0.25, evaluateAt(2));
+    void shouldReturnMaximumScoreAtIncidentStart() {
+        assertEquals(0.25, evaluateAt(0), DELTA);
     }
 
     @Test
-    void shouldReturnMediumScoreWithinFiveMinutes() {
-        assertEquals(0.20, evaluateAt(5));
+    void shouldReturnApproximatelyHalfScoreAfterFiveMinutes() {
+        assertEquals(0.125, evaluateAt(5), DELTA);
     }
 
     @Test
-    void shouldReturnLowerScoreWithinTenMinutes() {
-        assertEquals(0.10, evaluateAt(10));
+    void shouldReturnQuarterScoreAfterTenMinutes() {
+        assertEquals(0.0625, evaluateAt(10), DELTA);
     }
 
     @Test
-    void shouldReturnZeroBeyondTenMinutes() {
-        assertEquals(0.0, evaluateAt(11));
+    void shouldDecaySmoothlyBetweenTwoAndThreeMinutes() {
+        double afterTwoMinutes = evaluateAt(2);
+        double afterThreeMinutes = evaluateAt(3);
+
+        assertTrue(afterTwoMinutes > afterThreeMinutes);
+        assertTrue(afterThreeMinutes > 0.0);
+    }
+
+    @Test
+    void shouldReturnPositiveScoreBeyondTenMinutes() {
+        assertTrue(evaluateAt(11) > 0.0);
     }
 
     @Test
@@ -54,34 +69,55 @@ class TimeProximityRuleTest {
         Incident incident = new Incident();
         incident.setStartedAt(baseTime);
 
-        assertEquals(0.0, rule.evaluate(new CorrelationContext(alert, incident, List.of())));
-    }
-
-    @Test
-    void shouldReturnHighestScoreWhenAlertIsWithinTwoMinutesAndFiftyNineSeconds() {
-        Alert alert = new Alert();
-        alert.setTimestamp(baseTime.plusMinutes(2).plusSeconds(59));
-
-        Incident incident = new Incident();
-        incident.setStartedAt(baseTime);
-
         assertEquals(
-                0.25,
-                rule.evaluate(new CorrelationContext(alert, incident, List.of()))
+                0.0,
+                rule.evaluate(
+                        new CorrelationContext(alert, incident, List.of())
+                ),
+                DELTA
         );
     }
 
     @Test
-    void shouldReturnSameScoreWhenAlertOccursBeforeIncidentStart() {
-        Alert alert = new Alert();
-        alert.setTimestamp(baseTime.minusMinutes(2));
+    void shouldReturnMaximumScoreWhenTimestampsAreEqual() {
+        assertEquals(0.25, evaluateAt(0), DELTA);
+    }
+
+    @Test
+    void shouldReturnSameScoreForEqualAbsoluteTimeDifferences() {
+        Alert beforeAlert = new Alert();
+        beforeAlert.setTimestamp(baseTime.minusMinutes(2));
+
+        Alert afterAlert = new Alert();
+        afterAlert.setTimestamp(baseTime.plusMinutes(2));
 
         Incident incident = new Incident();
         incident.setStartedAt(baseTime);
 
+        double beforeScore = rule.evaluate(
+                new CorrelationContext(beforeAlert, incident, List.of())
+        );
+
+        double afterScore = rule.evaluate(
+                new CorrelationContext(afterAlert, incident, List.of())
+        );
+
+        assertEquals(beforeScore, afterScore, DELTA);
+    }
+
+    @Test
+    void shouldReturnZeroWhenIncidentStartIsNull() {
+        Alert alert = new Alert();
+        alert.setTimestamp(baseTime);
+
+        Incident incident = new Incident();
+
         assertEquals(
-                0.25,
-                rule.evaluate(new CorrelationContext(alert, incident, List.of()))
+                0.0,
+                rule.evaluate(
+                        new CorrelationContext(alert, incident, List.of())
+                ),
+                DELTA
         );
     }
 }
