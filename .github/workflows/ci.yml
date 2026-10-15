@@ -1,11 +1,10 @@
-
 name: CI
 
 on:
   push:
     branches: [main, master]
   pull_request:
-    branches: [main, master]
+    branches: [main, master] # Feature branches walin master ekata PR daddi meka trigger wenawa
 
 permissions:
   contents: read
@@ -17,7 +16,7 @@ jobs:
     timeout-minutes: 15
 
     env:
-      SPRING_PROFILES_ACTIVE: test
+      SPRING_PROFILES_ACTIVE: test # GitHub Actions Runner eka athule test profile eka active karanawa
 
     steps:
       - name: Checkout repository
