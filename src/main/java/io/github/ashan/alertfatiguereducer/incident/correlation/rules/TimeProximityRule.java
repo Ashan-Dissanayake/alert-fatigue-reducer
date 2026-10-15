@@ -1,47 +1,52 @@
+
 package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
+import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
-import org.springframework.stereotype.Component;
-
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Objects;
+
+import org.springframework.stereotype.Component;
 
 @Component
 public class TimeProximityRule implements CorrelationRule {
 
-    private static final double WITHIN_TWO_MINUTES = 0.25;
-    private static final double WITHIN_FIVE_MINUTES = 0.20;
-    private static final double WITHIN_TEN_MINUTES = 0.10;
+    private static final double MAX_SCORE = 0.25;
+    private static final double HALF_LIFE_MINUTES = 5.0;
 
     @Override
     public double evaluate(CorrelationContext context) {
-        var alert = context.alert();
-        var incident = context.incident();
+        Alert alert = context.alert();
 
-        LocalDateTime alertTimestamp = alert.getTimestamp();
-        LocalDateTime incidentStartedAt = incident.getStartedAt();
-
-        if (alertTimestamp == null || incidentStartedAt == null) {
+        if (alert.getTimestamp() == null) {
             return 0.0;
         }
 
-        long minutes = Math.abs(
-                Duration.between(incidentStartedAt, alertTimestamp).toMinutes()
-        );
+        LocalDateTime referenceTimestamp =
+                context.relatedAlerts().stream()
+                        .map(Alert::getTimestamp)
+                        .filter(Objects::nonNull)
+                        .max(LocalDateTime::compareTo)
+                        .orElse(context.incident().getStartedAt());
 
-        if (minutes <= 2) {
-            return WITHIN_TWO_MINUTES;
+        if (referenceTimestamp == null) {
+            return 0.0;
         }
 
-        if (minutes <= 5) {
-            return WITHIN_FIVE_MINUTES;
+        // Out-of-order alerts receive no temporal correlation score.
+        if (alert.getTimestamp().isBefore(referenceTimestamp)) {
+            return 0.0;
         }
 
-        if (minutes <= 10) {
-            return WITHIN_TEN_MINUTES;
-        }
+        double elapsedMinutes = Duration.between(
+                referenceTimestamp,
+                alert.getTimestamp()
+        ).toMillis() / 60_000.0;
 
-        return 0.0;
+        double decayRate = Math.log(2.0) / HALF_LIFE_MINUTES;
+
+        return MAX_SCORE * Math.exp(-decayRate * elapsedMinutes);
     }
 }
