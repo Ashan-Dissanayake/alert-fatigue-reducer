@@ -1,12 +1,14 @@
+
 package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
+import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
-import org.springframework.stereotype.Component;
-
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
+import org.springframework.stereotype.Component;
 
 @Component
 public class TimeProximityRule implements CorrelationRule {
@@ -16,22 +18,32 @@ public class TimeProximityRule implements CorrelationRule {
 
     @Override
     public double evaluate(CorrelationContext context) {
-        var alert = context.alert();
-        var incident = context.incident();
+        Alert alert = context.alert();
 
-        LocalDateTime alertTimestamp = alert.getTimestamp();
-        LocalDateTime incidentStartedAt = incident.getStartedAt();
-
-        if (alertTimestamp == null || incidentStartedAt == null) {
+        if (alert.getTimestamp() == null) {
             return 0.0;
         }
 
-        double elapsedMinutes = Math.abs(
-                Duration.between(
-                        incidentStartedAt,
-                        alertTimestamp
-                ).toMillis() / 60_000.0
-        );
+        LocalDateTime referenceTimestamp =
+                context.relatedAlerts().stream()
+                        .map(Alert::getTimestamp)
+                        .filter(Objects::nonNull)
+                        .max(LocalDateTime::compareTo)
+                        .orElse(context.incident().getStartedAt());
+
+        if (referenceTimestamp == null) {
+            return 0.0;
+        }
+
+        // Out-of-order alerts receive no temporal correlation score.
+        if (alert.getTimestamp().isBefore(referenceTimestamp)) {
+            return 0.0;
+        }
+
+        double elapsedMinutes = Duration.between(
+                referenceTimestamp,
+                alert.getTimestamp()
+        ).toMillis() / 60_000.0;
 
         double decayRate = Math.log(2.0) / HALF_LIFE_MINUTES;
 

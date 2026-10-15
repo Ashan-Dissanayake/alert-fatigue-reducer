@@ -83,27 +83,22 @@ class TimeProximityRuleTest {
         assertEquals(0.25, evaluateAt(0), DELTA);
     }
 
-    @Test
-    void shouldReturnSameScoreForEqualAbsoluteTimeDifferences() {
-        Alert beforeAlert = new Alert();
-        beforeAlert.setTimestamp(baseTime.minusMinutes(2));
 
-        Alert afterAlert = new Alert();
-        afterAlert.setTimestamp(baseTime.plusMinutes(2));
+    @Test
+    void shouldReturnZeroWhenAlertTimestampIsBeforeIncidentStart() {
+        Alert alert = new Alert();
+        alert.setTimestamp(baseTime.minusMinutes(2));
 
         Incident incident = new Incident();
         incident.setStartedAt(baseTime);
 
-        double beforeScore = rule.evaluate(
-                new CorrelationContext(beforeAlert, incident, List.of())
+        double score = rule.evaluate(
+                new CorrelationContext(alert, incident, List.of())
         );
 
-        double afterScore = rule.evaluate(
-                new CorrelationContext(afterAlert, incident, List.of())
-        );
-
-        assertEquals(beforeScore, afterScore, DELTA);
+        assertEquals(0.0, score, DELTA);
     }
+
 
     @Test
     void shouldReturnZeroWhenIncidentStartIsNull() {
@@ -120,4 +115,32 @@ class TimeProximityRuleTest {
                 DELTA
         );
     }
+
+
+    @Test
+    void shouldCalculateScoreFromLatestRelatedAlertTimestamp() {
+        Alert olderRelatedAlert = new Alert();
+        olderRelatedAlert.setTimestamp(baseTime);
+
+        Alert latestRelatedAlert = new Alert();
+        latestRelatedAlert.setTimestamp(baseTime.plusMinutes(4));
+
+        Alert incomingAlert = new Alert();
+        incomingAlert.setTimestamp(baseTime.plusMinutes(9));
+
+        Incident incident = new Incident();
+        incident.setStartedAt(baseTime);
+
+        double score = rule.evaluate(
+                new CorrelationContext(
+                        incomingAlert,
+                        incident,
+                        List.of(olderRelatedAlert, latestRelatedAlert)
+                )
+        );
+
+        // 5 minutes after the latest related alert: half of MAX_SCORE.
+        assertEquals(0.125, score, DELTA);
+    }
+
 }
