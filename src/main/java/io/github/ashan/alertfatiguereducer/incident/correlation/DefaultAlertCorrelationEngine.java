@@ -20,20 +20,18 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
 
-    private static final double CORRELATION_THRESHOLD = 0.70;
-    private static final long CORRELATION_WINDOW_MINUTES = 10;
-
     private final IncidentRepository incidentRepository;
     private final IncidentAlertService incidentAlertService;
     private final IncidentService incidentService;
     private final List<CorrelationRule> correlationRules;
+    private final CorrelationProperties correlationProperties;
 
 
     @Override
     @Transactional
     public CorrelationResult correlate(Alert alert) {
         LocalDateTime cutoff = alert.getTimestamp()
-                .minusMinutes(CORRELATION_WINDOW_MINUTES);
+                .minusMinutes(correlationProperties.getWindowMinutes());
 
         List<Incident> candidates =
                 incidentRepository.findByStatusAndEnvironmentAndLastUpdatedAtAfter(
@@ -66,7 +64,7 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                     );
                 })
                 .filter(result ->
-                        result.score() >= CORRELATION_THRESHOLD
+                        result.score() >= correlationProperties.getThreshold()
                 )
                 .max(Comparator.comparingDouble(CorrelationResult::score))
                 .map(result -> {

@@ -38,11 +38,14 @@ class DefaultAlertCorrelationEngineTest {
         incidentService = mock(IncidentService.class);
         correlationRule = mock(CorrelationRule.class);
 
+        CorrelationProperties properties = new CorrelationProperties();
+
         engine = new DefaultAlertCorrelationEngine(
                 incidentRepository,
                 incidentAlertService,
                 incidentService,
-                List.of(correlationRule)
+                List.of(correlationRule),
+                properties
         );
     }
 
@@ -231,16 +234,20 @@ class DefaultAlertCorrelationEngineTest {
                 .thenReturn(List.of(candidate));
 
         when(incidentAlertService.findAlertsByIncidentId(80L))
-                .thenReturn(List.of(createAlert(1L, "CPU_HIGH", "order-service")));
+                .thenReturn(List.of(
+                        createAlert(1L, "CPU_HIGH", "order-service")
+                ));
 
         CorrelationRule secondRule = mock(CorrelationRule.class);
+        CorrelationProperties properties = new CorrelationProperties();
 
         DefaultAlertCorrelationEngine multiRuleEngine =
                 new DefaultAlertCorrelationEngine(
                         incidentRepository,
                         incidentAlertService,
                         incidentService,
-                        List.of(correlationRule, secondRule)
+                        List.of(correlationRule, secondRule),
+                        properties
                 );
 
         when(correlationRule.evaluate(any(CorrelationContext.class)))
@@ -255,6 +262,8 @@ class DefaultAlertCorrelationEngineTest {
         assertEquals(80L, result.incidentId());
         assertEquals(0.75, result.score(), 0.000001);
 
+        verify(correlationRule).evaluate(any(CorrelationContext.class));
+        verify(secondRule).evaluate(any(CorrelationContext.class));
         verify(incidentAlertService).attachAlert(80L, 6L, 0.75);
         verify(incidentService, never()).createIncident(any());
     }
