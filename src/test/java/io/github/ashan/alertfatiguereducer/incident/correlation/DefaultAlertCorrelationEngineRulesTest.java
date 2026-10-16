@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,10 +40,16 @@ class DefaultAlertCorrelationEngineRulesTest {
         incidentAlertService = mock(IncidentAlertService.class);
         incidentService = mock(IncidentService.class);
 
+        AlertRelationshipStore relationshipStore =
+                mock(AlertRelationshipStore.class);
+
+        when(relationshipStore.findRelatedTypes("LATENCY_HIGH"))
+                .thenReturn(Set.of("CPU_HIGH"));
+
         List<CorrelationRule> rules = List.of(
                 new SameServiceRule(),
                 new SameEnvironmentRule(),
-                new RelatedAlertTypeRule(),
+                new RelatedAlertTypeRule(relationshipStore),
                 new TimeProximityRule()
         );
 

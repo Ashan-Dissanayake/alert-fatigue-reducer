@@ -2,30 +2,22 @@ package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertType;
+import io.github.ashan.alertfatiguereducer.incident.correlation.AlertRelationshipStore;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
-import org.springframework.stereotype.Component;
-
-import java.util.Map;
 import java.util.Set;
+import org.springframework.stereotype.Component;
 
 @Component
 public class RelatedAlertTypeRule implements CorrelationRule {
 
     private static final double SCORE = 0.30;
 
-    private static final Map<AlertType, Set<AlertType>> RELATED_TYPES = Map.of(
-            AlertType.CPU_HIGH, Set.of(AlertType.LATENCY_HIGH),
-            AlertType.LATENCY_HIGH, Set.of(
-                    AlertType.CPU_HIGH,
-                    AlertType.ERROR_RATE_HIGH
-            ),
-            AlertType.ERROR_RATE_HIGH, Set.of(
-                    AlertType.LATENCY_HIGH,
-                    AlertType.TIMEOUT
-            ),
-            AlertType.TIMEOUT, Set.of(AlertType.ERROR_RATE_HIGH)
-    );
+    private final AlertRelationshipStore relationshipStore;
+
+    public RelatedAlertTypeRule(AlertRelationshipStore relationshipStore) {
+        this.relationshipStore = relationshipStore;
+    }
 
     @Override
     public double evaluate(CorrelationContext context) {
@@ -35,30 +27,25 @@ public class RelatedAlertTypeRule implements CorrelationRule {
             return 0.0;
         }
 
-        AlertType incomingType;
+        String incomingType = incomingAlert.getType();
+
         try {
-            incomingType = AlertType.valueOf(incomingAlert.getType());
+            AlertType.valueOf(incomingType);
         } catch (IllegalArgumentException exception) {
             return 0.0;
         }
 
-        Set<AlertType> relatedTypes = RELATED_TYPES.get(incomingType);
+        Set<String> relatedTypes =
+                relationshipStore.findRelatedTypes(incomingType);
 
-        if (relatedTypes == null) {
+        if (relatedTypes.isEmpty()) {
             return 0.0;
         }
-
 
         return context.relatedAlerts().stream()
                 .map(Alert::getType)
                 .filter(type -> type != null)
-                .anyMatch(type -> {
-                    try {
-                        return relatedTypes.contains(AlertType.valueOf(type));
-                    } catch (IllegalArgumentException exception) {
-                        return false;
-                    }
-                })
+                .anyMatch(relatedTypes::contains)
                 ? SCORE
                 : 0.0;
     }
