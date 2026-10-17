@@ -15,8 +15,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class CorrelationLockServiceIntegrationTest
         extends AbstractPostgresIntegrationTest {
@@ -107,6 +106,33 @@ class CorrelationLockServiceIntegrationTest
             executor.shutdownNow();
         }
     }
+
+
+    @Test
+    void shouldReleaseAdvisoryLockAfterTransactionRollback() throws Exception {
+        TransactionTemplate transactionTemplate =
+                new TransactionTemplate(transactionManager);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> transactionTemplate.executeWithoutResult(status -> {
+                    correlationLockService.lockEnvironment(
+                            AlertEnvironment.DEVELOPMENT);
+
+                    throw new IllegalStateException("Simulated transaction failure");
+                })
+        );
+
+        Boolean acquired = transactionTemplate.execute(status -> {
+            correlationLockService.lockEnvironment(
+                    AlertEnvironment.DEVELOPMENT);
+            return true;
+        });
+
+        assertEquals(Boolean.TRUE, acquired,
+                "The advisory lock should be available after rollback");
+    }
+
 
     private void await(CountDownLatch latch) {
         try {
