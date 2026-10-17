@@ -43,14 +43,14 @@ class DefaultAlertCorrelationEngineRulesTest {
         when(relationshipStore.findRelatedTypes("LATENCY_HIGH"))
                 .thenReturn(Set.of("CPU_HIGH"));
 
-        List<CorrelationRule> rules = List.of(
-                new SameServiceRule(),
-                new SameEnvironmentRule(),
-                new RelatedAlertTypeRule(relationshipStore),
-                new TimeProximityRule()
-        );
-
         CorrelationProperties properties = new CorrelationProperties();
+
+        List<CorrelationRule> rules = List.of(
+                new SameServiceRule(properties),
+                new SameEnvironmentRule(properties),
+                new RelatedAlertTypeRule(relationshipStore, properties),
+                new TimeProximityRule(properties)
+        );
 
         engine = new DefaultAlertCorrelationEngine(
                 incidentRepository,

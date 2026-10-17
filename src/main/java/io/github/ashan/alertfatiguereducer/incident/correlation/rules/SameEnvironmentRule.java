@@ -1,15 +1,16 @@
 package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
-import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
-import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class SameEnvironmentRule implements CorrelationRule {
 
-    private static final double SCORE = 0.15;
+    private final CorrelationProperties properties;
 
     @Override
     public double evaluate(CorrelationContext context) {
@@ -23,7 +24,7 @@ public class SameEnvironmentRule implements CorrelationRule {
         }
 
         return alert.getEnvironment() == incident.getEnvironment()
-                ? SCORE
+                ? properties.getSameEnvironmentWeight()
                 : 0.0;
     }
 }

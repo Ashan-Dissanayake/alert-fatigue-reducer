@@ -2,6 +2,7 @@ package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SameServiceRuleTest {
 
-    private final SameServiceRule rule = new SameServiceRule();
+
+    CorrelationProperties properties = new CorrelationProperties();
+    private final SameServiceRule rule = new SameServiceRule(properties);
 
     @Test
     void shouldReturnScoreWhenServicesMatch() {

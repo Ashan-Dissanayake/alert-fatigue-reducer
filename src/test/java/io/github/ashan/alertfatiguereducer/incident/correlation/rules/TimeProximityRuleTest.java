@@ -2,6 +2,7 @@ package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +17,8 @@ class TimeProximityRuleTest {
 
     private static final double DELTA = 0.000001;
 
-    private final TimeProximityRule rule = new TimeProximityRule();
+    CorrelationProperties properties = new CorrelationProperties();
+    private final TimeProximityRule rule = new TimeProximityRule(properties);
 
     private final LocalDateTime baseTime =
             LocalDateTime.of(2026, 10, 9, 10, 0);
