@@ -30,6 +30,7 @@ class DefaultAlertCorrelationEngineTest {
     private IncidentService incidentService;
     private CorrelationRule correlationRule;
     private DefaultAlertCorrelationEngine engine;
+    private io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationLockService correlationLockService;
 
     @BeforeEach
     void setUp() {
@@ -37,6 +38,7 @@ class DefaultAlertCorrelationEngineTest {
         incidentAlertService = mock(IncidentAlertService.class);
         incidentService = mock(IncidentService.class);
         correlationRule = mock(CorrelationRule.class);
+        correlationLockService = mock(CorrelationLockService.class);
 
         CorrelationProperties properties = new CorrelationProperties();
 
@@ -45,7 +47,8 @@ class DefaultAlertCorrelationEngineTest {
                 incidentAlertService,
                 incidentService,
                 List.of(correlationRule),
-                properties
+                properties,
+                correlationLockService
         );
     }
 
@@ -247,7 +250,8 @@ class DefaultAlertCorrelationEngineTest {
                         incidentAlertService,
                         incidentService,
                         List.of(correlationRule, secondRule),
-                        properties
+                        properties,
+                        correlationLockService
                 );
 
         when(correlationRule.evaluate(any(CorrelationContext.class)))
