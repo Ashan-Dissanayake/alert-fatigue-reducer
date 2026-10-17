@@ -2,13 +2,16 @@ package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class SameServiceRule implements CorrelationRule {
 
-    private static final double SCORE = 0.30;
+    private final CorrelationProperties properties;
 
     @Override
     public double evaluate(CorrelationContext context) {
@@ -20,7 +23,7 @@ public class SameServiceRule implements CorrelationRule {
         }
 
         return alert.getService().equals(incident.getService())
-                ? SCORE
+                ? properties.getSameServiceWeight()
                 : 0.0;
     }
 }

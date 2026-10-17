@@ -3,6 +3,7 @@ package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SameEnvironmentRuleTest {
 
-    private final SameEnvironmentRule rule = new SameEnvironmentRule();
+    CorrelationProperties properties = new CorrelationProperties();
+    private final SameEnvironmentRule rule = new SameEnvironmentRule(properties);
 
     @Test
     void shouldReturnScoreWhenEnvironmentsMatch() {

@@ -11,6 +11,8 @@ import io.github.ashan.alertfatiguereducer.incident.correlation.AlertRelationshi
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
 import java.util.List;
 import java.util.Set;
+
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +24,9 @@ class RelatedAlertTypeRuleTest {
     @BeforeEach
     void setUp() {
         relationshipStore = mock(AlertRelationshipStore.class);
-        rule = new RelatedAlertTypeRule(relationshipStore);
+
+        CorrelationProperties properties = new CorrelationProperties();
+        rule = new RelatedAlertTypeRule(relationshipStore, properties);
     }
 
     @Test

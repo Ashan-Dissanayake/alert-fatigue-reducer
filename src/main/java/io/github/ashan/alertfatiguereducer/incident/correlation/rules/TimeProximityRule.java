@@ -3,18 +3,20 @@ package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class TimeProximityRule implements CorrelationRule {
 
-    private static final double MAX_SCORE = 0.25;
-    private static final double HALF_LIFE_MINUTES = 5.0;
+    private final CorrelationProperties properties;
 
     @Override
     public double evaluate(CorrelationContext context) {
@@ -45,8 +47,8 @@ public class TimeProximityRule implements CorrelationRule {
                 alert.getTimestamp()
         ).toMillis() / 60_000.0;
 
-        double decayRate = Math.log(2.0) / HALF_LIFE_MINUTES;
+        double decayRate = Math.log(2.0) / properties.getTimeProximityHalfLifeMinutes();
 
-        return MAX_SCORE * Math.exp(-decayRate * elapsedMinutes);
+        return properties.getTimeProximityMaxScore() * Math.exp(-decayRate * elapsedMinutes);
     }
 }

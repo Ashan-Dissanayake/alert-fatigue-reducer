@@ -4,20 +4,20 @@ import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertType;
 import io.github.ashan.alertfatiguereducer.incident.correlation.AlertRelationshipStore;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
+import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
 import java.util.Set;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class RelatedAlertTypeRule implements CorrelationRule {
 
-    private static final double SCORE = 0.30;
-
     private final AlertRelationshipStore relationshipStore;
+    private final CorrelationProperties properties;
 
-    public RelatedAlertTypeRule(AlertRelationshipStore relationshipStore) {
-        this.relationshipStore = relationshipStore;
-    }
 
     @Override
     public double evaluate(CorrelationContext context) {
@@ -46,7 +46,7 @@ public class RelatedAlertTypeRule implements CorrelationRule {
                 .map(Alert::getType)
                 .filter(type -> type != null)
                 .anyMatch(relatedTypes::contains)
-                ? SCORE
+                ? properties.getRelatedAlertTypeWeight()
                 : 0.0;
     }
 }
