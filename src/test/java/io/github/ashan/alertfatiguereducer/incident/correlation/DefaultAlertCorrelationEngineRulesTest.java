@@ -28,7 +28,6 @@ class DefaultAlertCorrelationEngineRulesTest {
     private IncidentRepository incidentRepository;
     private IncidentAlertService incidentAlertService;
     private IncidentService incidentService;
-    private CorrelationLockService correlationLockService;
 
     private DefaultAlertCorrelationEngine engine;
 
@@ -37,7 +36,6 @@ class DefaultAlertCorrelationEngineRulesTest {
         incidentRepository = mock(IncidentRepository.class);
         incidentAlertService = mock(IncidentAlertService.class);
         incidentService = mock(IncidentService.class);
-        correlationLockService = mock(CorrelationLockService.class);
 
         AlertRelationshipStore relationshipStore =
                 mock(AlertRelationshipStore.class);
@@ -59,8 +57,7 @@ class DefaultAlertCorrelationEngineRulesTest {
                 incidentAlertService,
                 incidentService,
                 rules,
-                properties,
-                correlationLockService
+                properties
         );
     }
 
