@@ -25,13 +25,17 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
     private final IncidentService incidentService;
     private final List<CorrelationRule> correlationRules;
     private final CorrelationProperties correlationProperties;
+    private final CorrelationLockService correlationLockService;
 
 
     @Override
     @Transactional
     public CorrelationResult correlate(Alert alert) {
+        correlationLockService.lockEnvironment(alert.getEnvironment());
+
         LocalDateTime cutoff = alert.getTimestamp()
                 .minusMinutes(correlationProperties.getWindowMinutes());
+
 
         List<Incident> candidates =
                 incidentRepository.findByStatusAndEnvironmentAndLastUpdatedAtAfter(
