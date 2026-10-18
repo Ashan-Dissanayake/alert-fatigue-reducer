@@ -15,7 +15,9 @@ The correlation score represents the strength of a rule-based match, **not the p
 ## Features
 
 - **Rule-based alert correlation** using service, environment, alert-type relationships, and time proximity.
-- **Weighted correlation scoring** with a decision threshold.
+- **Weighted correlation scoring** with configurable rule weights, a decision threshold, candidate time window, and exponential temporal decay.
+- **Database-backed alert-type relationships** managed through Flyway migrations, avoiding hardcoded relationship maps.
+- **Concurrency-safe incident correlation** using PostgreSQL transaction-level advisory locks to serialize correlation requests within the same environment.
 - **Incident creation and alert association** when no existing incident meets the threshold.
 - **Incident severity escalation** when a more severe alert is associated with an incident.
 - **Incident lifecycle management** with `OPEN` and `RESOLVED` states.
@@ -27,7 +29,7 @@ The correlation score represents the strength of a rule-based match, **not the p
 - **Database migrations** managed through Flyway.
 - **API documentation** through Swagger UI and OpenAPI.
 - **Application monitoring** through Spring Boot Actuator.
-- **Automated tests**, including unit tests, controller tests, correlation-rule tests, and PostgreSQL integration tests using Testcontainers.
+- **Automated tests**, including unit tests, controller tests, correlation-rule tests, transaction rollback tests, concurrency tests, and PostgreSQL integration tests using Testcontainers.
 
 ## Technology Stack
 
@@ -38,7 +40,7 @@ The correlation score represents the strength of a rule-based match, **not the p
 | Spring Web MVC | HTTP endpoints |
 | Spring Data JPA | Persistence and database access |
 | Spring Security | HTTP Basic authentication |
-| PostgreSQL | Relational database |
+| PostgreSQL | Relational database and transaction-level advisory locks |
 | Flyway | Versioned database migrations |
 | Jakarta Bean Validation | Request validation |
 | Spring Boot Actuator | Health and application information endpoints |
@@ -60,34 +62,66 @@ flowchart TD
     D --> E[Alert Repository]
     D --> F[Correlation Engine]
     F --> G[Correlation Rules]
-    F --> H[Incident Service]
-    F --> I[Incident Alert Service]
-    H --> J[(PostgreSQL)]
-    E --> J
-    I --> J
-    K[Incident REST API] --> H
-    L[Flyway Migrations] --> J
+    F --> H[Correlation Lock Service]
+    F --> I[Incident Service]
+    F --> J[Incident Alert Service]
+    G --> K[Alert Relationship Store]
+    H --> L[(PostgreSQL Advisory Locks)]
+    E --> M[(PostgreSQL)]
+    I --> M
+    J --> M
+    K --> M
+    N[Incident REST API] --> I
+    O[Flyway Migrations] --> M
 ```
 
 ### Alert Correlation
 
-The correlation engine evaluates these signals:
+The correlation engine evaluates incoming alerts against candidate open incidents using the following signals:
 
 - **Same service:** Whether alerts originate from the same service.
 - **Same environment:** Whether alerts belong to the same deployment environment.
-- **Related alert types:** Whether the alert types have a predefined relationship.
-- **Time proximity:** Whether alerts occur within the candidate time window.
+- **Related alert types:** Whether the alert types have a predefined relationship stored in the database.
+- **Time proximity:** How close the alerts are in time, using an exponentially decaying score.
 
-The individual rule scores are combined and compared with the correlation threshold. Among qualifying candidates, the engine selects the highest-scoring incident.
-
-Current correlation settings:
-
-| Setting | Value |
-|---|---|
-| Candidate time window | 10 minutes |
-| Correlation threshold | `0.70` |
+The individual rule scores are combined and compared with the correlation threshold. Among qualifying candidates, the engine selects the highest-scoring incident. If no candidate qualifies, a new incident is created and the incoming alert is associated with it.
 
 The scoring mechanism is deterministic and rule-based. It does not perform machine-learning-based root-cause analysis.
+
+### Correlation Configuration
+
+Correlation behavior is configured through Spring Boot configuration properties rather than requiring source-code changes for every threshold or weight adjustment.
+
+Current default correlation settings:
+
+| Setting | Default |
+|---|---:|
+| Candidate time window | 10 minutes |
+| Correlation threshold | `0.70` |
+| Same-service weight | `0.30` |
+| Related-alert-type weight | `0.30` |
+| Same-environment weight | `0.15` |
+| Maximum temporal score | `0.25` |
+| Temporal decay half-life | 5 minutes |
+
+The temporal score decreases exponentially as the time difference increases. A five-minute half-life means the temporal contribution falls to half its initial value after five minutes.
+
+Alert-type relationships are stored in the database and managed through Flyway migrations, allowing the relationship data to evolve independently of the correlation engine implementation.
+
+### Concurrency Control
+
+Concurrent alert ingestion can cause race conditions if multiple requests evaluate the same candidate incidents before either transaction creates or updates an incident.
+
+To reduce this risk, the correlation engine obtains a PostgreSQL **transaction-level advisory lock scoped to the alert environment** before evaluating candidate incidents.
+
+This approach:
+
+- Serializes correlation operations within the same environment.
+- Allows correlation operations for different environments to proceed independently.
+- Holds the lock for the transaction's lifetime.
+- Releases the lock when the transaction commits or rolls back.
+
+The implementation is supported by PostgreSQL integration tests that verify concurrent correlation behavior, lock blocking, and lock release following transaction rollback.
 
 ## API Reference
 
@@ -122,6 +156,8 @@ Possible correlation actions include:
 
 - `NEW_INCIDENT`
 - `ATTACHED_TO_INCIDENT`
+
+The correlation score represents the strength of the rule-based match and should not be interpreted as a probability.
 
 ### Retrieve an Incident
 
@@ -261,7 +297,7 @@ Run the complete Maven verification lifecycle:
 
 PostgreSQL integration tests use Testcontainers and require a working Docker environment.
 
-The current verified test suite contains **82 tests**, with all tests passing in the last successful `clean verify` run.
+The latest verified full test run completed successfully with **100 tests passing**, with no failures, errors, or skipped tests.
 
 ## Security Notes
 
@@ -274,15 +310,16 @@ The current verified test suite contains **82 tests**, with all tests passing in
 ## Current Limitations
 
 - Correlation uses predefined, explainable rules rather than machine learning.
-- Correlation rules and the decision threshold are predefined in the current implementation.
+- Correlation weights, the decision threshold, candidate time window, and temporal decay settings are configurable, while the correlation strategy remains rule-based.
 - Alert ingestion is exposed through a REST API; external monitoring-platform integrations are not documented as implemented.
 - Persistent user management, fine-grained authorization, notification delivery, and automatic remediation are outside the current MVP scope.
+- Environment-level advisory locks serialize correlation operations within the same environment, which can limit throughput under high concurrent ingestion.
 - A frontend and a complete production deployment workflow are not included in the documented backend scope.
 
 ## Project Status
 
-The backend MVP implements alert ingestion, explainable alert correlation, incident management, validation, database migrations, authenticated API access, API documentation, and automated testing.
+The backend MVP implements alert ingestion, explainable alert correlation, incident management, database-backed alert relationships, configurable scoring, transaction-level concurrency control, validation, database migrations, authenticated API access, API documentation, and automated testing.
 
-The latest verified build completed successfully with **82 tests passing**.
+The latest verified full test run completed successfully with **100 tests passing**, with no failures, errors, or skipped tests.
 
-The project is intended to demonstrate practical backend engineering concepts, including modular application design, rule-based decision logic, REST API development, persistence, security configuration, and automated integration testing.
+The project demonstrates practical backend engineering concepts, including modular application design, rule-based decision logic, REST API development, relational persistence, transaction management, concurrency control, security configuration, and automated integration testing.
