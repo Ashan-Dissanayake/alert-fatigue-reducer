@@ -1,7 +1,10 @@
 package io.github.ashan.alertfatiguereducer.alert.dto.response;
 
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationAction;
+import io.github.ashan.alertfatiguereducer.incident.correlation.RuleEvaluation;
 import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.util.List;
 
 @Schema(
         name = "AlertCorrelationResponse",
@@ -30,6 +33,17 @@ public record AlertCorrelationResponse(
                 minimum = "0.0",
                 maximum = "1.0"
         )
-        double correlationScore
+        double correlationScore,
+
+        @Schema(description = "Rule-by-rule evaluation breakdown explaining why the incident was selected")
+        List<RuleEvaluation> explanations
 ) {
+    public AlertCorrelationResponse(
+            AlertResponse alert,
+            CorrelationAction correlationAction,
+            Long incidentId,
+            double correlationScore
+    ) {
+        this(alert, correlationAction, incidentId, correlationScore, List.of());
+    }
 }

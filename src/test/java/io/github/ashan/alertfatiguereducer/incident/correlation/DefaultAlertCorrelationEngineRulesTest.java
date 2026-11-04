@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -62,8 +64,8 @@ class DefaultAlertCorrelationEngineRulesTest {
     }
 
     @Test
-    void shouldCombineAllFourRulesAndAttachAlertWhenScoreMeetsThreshold() {
-        LocalDateTime timestamp = LocalDateTime.of(2026, 10, 10, 10, 0);
+    void shouldEvaluateRulesAndSelectCandidateWhenThresholdIsMet() {
+        LocalDateTime timestamp = LocalDateTime.now();
 
         Alert incomingAlert = new Alert();
         incomingAlert.setId(2L);
@@ -74,9 +76,10 @@ class DefaultAlertCorrelationEngineRulesTest {
 
         Incident candidate = new Incident();
         candidate.setId(50L);
+        candidate.setTitle("CPU_HIGH - payment-service");
         candidate.setService("payment-service");
         candidate.setEnvironment(AlertEnvironment.PRODUCTION);
-        candidate.setSeverity(IncidentSeverity.CRITICAL);
+        candidate.setSeverity(IncidentSeverity.WARNING);
         candidate.setStatus(IncidentStatus.OPEN);
         candidate.setStartedAt(timestamp.minusMinutes(1));
         candidate.setLastUpdatedAt(timestamp.minusMinutes(1));
@@ -99,7 +102,6 @@ class DefaultAlertCorrelationEngineRulesTest {
 
         CorrelationResult result = engine.correlate(incomingAlert);
 
-
         // Same service: 0.30
         // Same environment: 0.15
         // Related alert types: 0.30
@@ -110,10 +112,11 @@ class DefaultAlertCorrelationEngineRulesTest {
         assertEquals(50L, result.incidentId());
         assertEquals(0.967637640824031, result.score(), 0.000001);
 
+        assertFalse(result.explanations().isEmpty());
+        assertEquals(4, result.explanations().size());
+        assertTrue(result.explanations().stream().allMatch(RuleEvaluation::matched));
+
         verify(incidentAlertService)
                 .attachAlert(50L, 2L, result.score());
-
     }
-
-
 }

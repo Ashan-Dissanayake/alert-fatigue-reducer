@@ -26,7 +26,6 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
     private final List<CorrelationRule> correlationRules;
     private final CorrelationProperties correlationProperties;
 
-
     @Override
     @Transactional
     public CorrelationResult correlate(Alert alert) {
@@ -53,14 +52,32 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                             relatedAlerts
                     );
 
-                    double score = correlationRules.stream()
-                            .mapToDouble(rule -> rule.evaluate(context))
+                    List<RuleEvaluation> evaluations = correlationRules.stream()
+                            .map(rule -> {
+                                RuleEvaluation eval = rule.evaluateExplanation(context);
+                                if (eval != null) {
+                                    return eval;
+                                }
+                                double fallbackScore = rule.evaluate(context);
+                                return new RuleEvaluation(
+                                        rule.getClass().getSimpleName(),
+                                        fallbackScore,
+                                        fallbackScore,
+                                        fallbackScore > 0.0,
+                                        fallbackScore > 0.0 ? "Rule condition met" : "Rule condition not met"
+                                );
+                            })
+                            .toList();
+
+                    double score = evaluations.stream()
+                            .mapToDouble(RuleEvaluation::score)
                             .sum();
 
                     return new CorrelationResult(
                             CorrelationAction.ATTACHED_TO_INCIDENT,
                             incident.getId(),
-                            score
+                            score,
+                            evaluations
                     );
                 })
                 .filter(result ->
@@ -76,9 +93,6 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
 
                     return result;
                 })
-
-
-
                 .orElseGet(() -> {
                     Incident incident = incidentService.createIncident(
                             new CreateIncidentCommand(
@@ -86,7 +100,7 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                                     alert.getService(),
                                     alert.getEnvironment(),
                                     IncidentSeverity.valueOf(
-                                            alert.getSeverity().name()
+                                             alert.getSeverity().name()
                                     ),
                                     alert.getTimestamp(),
                                     null
@@ -102,7 +116,14 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                     return new CorrelationResult(
                             CorrelationAction.NEW_INCIDENT,
                             incident.getId(),
-                            0.0
+                            0.0,
+                            List.of(new RuleEvaluation(
+                                    "CorrelationThreshold",
+                                    0.0,
+                                    correlationProperties.getThreshold(),
+                                    false,
+                                    "No existing candidate incident met the correlation threshold of " + correlationProperties.getThreshold()
+                            ))
                     );
                 });
     }

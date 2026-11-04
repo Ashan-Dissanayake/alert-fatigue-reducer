@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-
 @Service
 @RequiredArgsConstructor
 public class AlertService {
@@ -41,7 +40,8 @@ public class AlertService {
                 alertResponse,
                 correlationResult.action(),
                 correlationResult.incidentId(),
-                correlationResult.score()
+                correlationResult.score(),
+                correlationResult.explanations()
         );
     }
 }
