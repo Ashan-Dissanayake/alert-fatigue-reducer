@@ -8,7 +8,7 @@ import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepositor
 import io.github.ashan.alertfatiguereducer.incident.service.CreateIncidentCommand;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentAlertService;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
