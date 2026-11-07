@@ -12,20 +12,20 @@ import io.github.ashan.alertfatiguereducer.alert.repository.AlertRepository;
 import io.github.ashan.alertfatiguereducer.incident.correlation.AlertCorrelationEngine;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationAction;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationResult;
+import io.github.ashan.alertfatiguereducer.incident.entity.IncidentAlert;
+import io.github.ashan.alertfatiguereducer.incident.repository.IncidentAlertRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-
-
 
 @ExtendWith(MockitoExtension.class)
 class AlertServiceTest {
@@ -36,6 +36,9 @@ class AlertServiceTest {
     @Mock
     private AlertCorrelationEngine alertCorrelationEngine;
 
+    @Mock
+    private IncidentAlertRepository incidentAlertRepository;
+
     private AlertMapper alertMapper;
     private AlertService alertService;
 
@@ -45,7 +48,8 @@ class AlertServiceTest {
         alertService = new AlertService(
                 alertRepository,
                 alertMapper,
-                alertCorrelationEngine
+                alertCorrelationEngine,
+                incidentAlertRepository
         );
     }
 
@@ -56,6 +60,9 @@ class AlertServiceTest {
                 "CPU_HIGH",
                 AlertSeverity.WARNING
         );
+
+        when(alertRepository.findFirstByServiceAndEnvironmentAndTypeAndTimestamp(any(), any(), any(), any()))
+                .thenReturn(Optional.empty());
 
         when(alertRepository.save(any(Alert.class)))
                 .thenAnswer(invocation -> {
@@ -98,11 +105,15 @@ class AlertServiceTest {
                 AlertSeverity.WARNING
         );
 
-        ArgumentCaptor<Alert> alertCaptor =
-                ArgumentCaptor.forClass(Alert.class);
+        when(alertRepository.findFirstByServiceAndEnvironmentAndTypeAndTimestamp(any(), any(), any(), any()))
+                .thenReturn(Optional.empty());
 
         when(alertRepository.save(any(Alert.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation -> {
+                    Alert alert = invocation.getArgument(0);
+                    alert.setId(1L);
+                    return alert;
+                });
 
         mockCorrelationResult(
                 CorrelationAction.NEW_INCIDENT,
@@ -112,26 +123,26 @@ class AlertServiceTest {
 
         alertService.createAlert(request);
 
-        verify(alertRepository).save(alertCaptor.capture());
-
-        Alert savedAlert = alertCaptor.getValue();
-
-        assertThat(savedAlert.getCreatedAt()).isNotNull();
-        verify(alertCorrelationEngine).correlate(savedAlert);
+        verify(alertRepository).save(argThat(alert ->
+                alert.getCreatedAt() != null
+        ));
     }
 
     @Test
-    void shouldMapSavedAlertToResponse() {
+    void shouldMapAllAlertFieldsCorrectly() {
         CreateAlertRequest request = createRequest(
-                "payment-service",
-                "ERROR_RATE_HIGH",
-                AlertSeverity.CRITICAL
+                "order-service",
+                "CPU_HIGH",
+                AlertSeverity.WARNING
         );
+
+        when(alertRepository.findFirstByServiceAndEnvironmentAndTypeAndTimestamp(any(), any(), any(), any()))
+                .thenReturn(Optional.empty());
 
         when(alertRepository.save(any(Alert.class)))
                 .thenAnswer(invocation -> {
                     Alert alert = invocation.getArgument(0);
-                    alert.setId(25L);
+                    alert.setId(1L);
                     return alert;
                 });
 
@@ -144,8 +155,12 @@ class AlertServiceTest {
         AlertCorrelationResponse response =
                 alertService.createAlert(request);
 
-        assertThat(response.alert().id()).isEqualTo(25L);
-        assertThat(response.alert().service()).isEqualTo("payment-service");
+        assertThat(response.alert().source()).isEqualTo(AlertSource.CUSTOM);
+        assertThat(response.alert().service()).isEqualTo("order-service");
+        assertThat(response.alert().environment()).isEqualTo(AlertEnvironment.PRODUCTION);
+        assertThat(response.alert().type()).isEqualTo("CPU_HIGH");
+        assertThat(response.alert().severity()).isEqualTo(AlertSeverity.WARNING);
+        assertThat(response.alert().message()).isEqualTo("Test alert message");
         assertThat(response.alert().metric()).isEqualTo("cpu_usage");
         assertThat(response.alert().value()).isEqualTo(94.5);
         assertThat(response.alert().threshold()).isEqualTo(90.0);
@@ -159,12 +174,59 @@ class AlertServiceTest {
     }
 
     @Test
+    void shouldHandleDuplicateAlertIdempotentlyWithoutRecreatingOrRecorrelating() {
+        CreateAlertRequest request = createRequest(
+                "order-service",
+                "CPU_HIGH",
+                AlertSeverity.WARNING
+        );
+
+        Alert existingAlert = new Alert();
+        existingAlert.setId(99L);
+        existingAlert.setSource(AlertSource.CUSTOM);
+        existingAlert.setService("order-service");
+        existingAlert.setEnvironment(AlertEnvironment.PRODUCTION);
+        existingAlert.setType("CPU_HIGH");
+        existingAlert.setSeverity(AlertSeverity.WARNING);
+        existingAlert.setMessage("Test alert message");
+        existingAlert.setTimestamp(request.timestamp());
+        existingAlert.setCreatedAt(LocalDateTime.now().minusMinutes(2));
+
+        when(alertRepository.findFirstByServiceAndEnvironmentAndTypeAndTimestamp(
+                request.service(),
+                request.environment(),
+                request.type(),
+                request.timestamp()
+        )).thenReturn(Optional.of(existingAlert));
+
+        IncidentAlert existingIncidentAlert = new IncidentAlert(42L, 99L, 0.90);
+        when(incidentAlertRepository.findByAlertId(99L))
+                .thenReturn(Optional.of(existingIncidentAlert));
+
+        AlertCorrelationResponse response = alertService.createAlert(request);
+
+        assertThat(response.alert().id()).isEqualTo(99L);
+        assertThat(response.correlationAction()).isEqualTo(CorrelationAction.ATTACHED_TO_INCIDENT);
+        assertThat(response.incidentId()).isEqualTo(42L);
+        assertThat(response.correlationScore()).isEqualTo(0.90);
+        assertThat(response.explanations()).hasSize(1);
+        assertThat(response.explanations().get(0).ruleName()).isEqualTo("IdempotentDeduplication");
+
+        // Verify neither save nor correlate are invoked
+        verify(alertRepository, never()).save(any(Alert.class));
+        verifyNoInteractions(alertCorrelationEngine);
+    }
+
+    @Test
     void shouldPropagateRepositoryException() {
         CreateAlertRequest request = createRequest(
                 "order-service",
                 "CPU_HIGH",
                 AlertSeverity.WARNING
         );
+
+        when(alertRepository.findFirstByServiceAndEnvironmentAndTypeAndTimestamp(any(), any(), any(), any()))
+                .thenReturn(Optional.empty());
 
         when(alertRepository.save(any(Alert.class)))
                 .thenThrow(new RuntimeException("Database error"));
@@ -184,6 +246,9 @@ class AlertServiceTest {
                 "CPU_HIGH",
                 AlertSeverity.WARNING
         );
+
+        when(alertRepository.findFirstByServiceAndEnvironmentAndTypeAndTimestamp(any(), any(), any(), any()))
+                .thenReturn(Optional.empty());
 
         when(alertRepository.save(any(Alert.class)))
                 .thenAnswer(invocation -> {
