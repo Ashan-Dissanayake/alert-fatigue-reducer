@@ -1,4 +1,3 @@
-
 package io.github.ashan.alertfatiguereducer.incident.controller;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
@@ -132,5 +131,40 @@ public class IncidentController {
                 incidentService.getAllIncidents(status, environment, pageable);
 
         return ResponseEntity.ok(incidents);
+    }
+
+    @Operation(
+            summary = "Resolve an incident",
+            description = """
+                    Transitions an open incident to RESOLVED status and updates its lastUpdatedAt timestamp.
+                    Subsequent alerts matching this incident will no longer attach to it and will instead
+                    form a new incident.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "Incident successfully resolved"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Incident not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            )
+    })
+    @PutMapping("/{incidentId}/resolve")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resolveIncident(
+            @Parameter(
+                    description = "Unique identifier of the incident to resolve",
+                    example = "1",
+                    required = true
+            )
+            @PathVariable Long incidentId
+    ) {
+        incidentService.resolveIncident(incidentId);
     }
 }

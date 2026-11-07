@@ -30,7 +30,8 @@ public class AlertController {
 
                     The alert is either attached to a matching open incident
                     or used to create a new incident. The response includes
-                    the correlation action, incident ID, and correlation score.
+                    the correlation action, incident ID, correlation score,
+                    and rule evaluation breakdown.
                     """
     )
     @ApiResponses({
@@ -45,6 +46,10 @@ public class AlertController {
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class)
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Missing or invalid credentials"
             )
     })
     @PostMapping

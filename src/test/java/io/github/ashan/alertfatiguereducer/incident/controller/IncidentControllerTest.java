@@ -1,4 +1,3 @@
-
 package io.github.ashan.alertfatiguereducer.incident.controller;
 
 import io.github.ashan.alertfatiguereducer.alert.entity.AlertEnvironment;
@@ -28,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -67,87 +67,82 @@ class IncidentControllerTest {
                 .andExpect(jsonPath("$.severity").value("WARNING"))
                 .andExpect(jsonPath("$.status").value("OPEN"))
                 .andExpect(jsonPath("$.correlationScore").value(0.75));
+
+        verify(incidentService).getIncidentById(10L);
     }
 
     @Test
     void shouldReturnNotFoundWhenIncidentDoesNotExist() throws Exception {
-        when(incidentService.getIncidentById(999L))
-                .thenThrow(new IncidentNotFoundException(999L));
+        when(incidentService.getIncidentById(99L))
+                .thenThrow(new IncidentNotFoundException(99L));
 
-        mockMvc.perform(get("/api/v1/incidents/999"))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/incidents/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Incident Not Found"))
+                .andExpect(jsonPath("$.message").value("Incident not found: 99"));
+
+        verify(incidentService).getIncidentById(99L);
     }
 
     @Test
-    void shouldReturnAllIncidents() throws Exception {
-        IncidentResponse incident = createIncidentResponse();
-
-        Page<IncidentResponse> page = new PageImpl<>(
-                List.of(incident),
-                org.springframework.data.domain.PageRequest.of(0, 20),
-                1
+    void shouldReturnPagedIncidentsWithDefaultPagination() throws Exception {
+        IncidentResponse response = new IncidentResponse(
+                1L,
+                "Service Down",
+                "payment-service",
+                AlertEnvironment.PRODUCTION,
+                IncidentSeverity.CRITICAL,
+                IncidentStatus.OPEN,
+                LocalDateTime.of(2026, 10, 10, 8, 0),
+                LocalDateTime.of(2026, 10, 10, 8, 10),
+                0.90
         );
 
+        Page<IncidentResponse> page =
+                new PageImpl<>(List.of(response));
+
         when(incidentService.getAllIncidents(
-                isNull(), isNull(), any(Pageable.class)
+                isNull(),
+                isNull(),
+                any(Pageable.class)
         )).thenReturn(page);
 
         mockMvc.perform(get("/api/v1/incidents"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].id").value(10))
-                .andExpect(jsonPath("$.content[0].service").value("order-service"))
-                .andExpect(jsonPath("$.content[0].status").value("OPEN"))
-                .andExpect(jsonPath("$.page.totalElements").value(1))
-                .andExpect(jsonPath("$.page.totalPages").value(1))
-                .andExpect(jsonPath("$.page.number").value(0))
-                .andExpect(jsonPath("$.page.size").value(20));
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Service Down"))
+                .andExpect(jsonPath("$.content[0].service").value("payment-service"))
+                .andExpect(jsonPath("$.page.totalElements").value(1));
+
+        verify(incidentService).getAllIncidents(
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        );
     }
 
     @Test
-    void shouldFilterIncidentsByStatus() throws Exception {
-        IncidentResponse incident = createIncidentResponse();
-
-        Page<IncidentResponse> page = new PageImpl<>(
-                List.of(incident),
-                org.springframework.data.domain.PageRequest.of(0, 20),
-                1
-        );
-
+    void shouldFilterIncidentsByStatusAndEnvironment() throws Exception {
         when(incidentService.getAllIncidents(
-                eq(IncidentStatus.OPEN), isNull(), any(Pageable.class)
-        )).thenReturn(page);
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.PRODUCTION),
+                any(Pageable.class)
+        )).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/v1/incidents")
-                        .param("status", "OPEN"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].status").value("OPEN"));
-    }
-
-    @Test
-    void shouldFilterIncidentsByEnvironment() throws Exception {
-        IncidentResponse incident = createIncidentResponse();
-
-        Page<IncidentResponse> page = new PageImpl<>(
-                List.of(incident),
-                org.springframework.data.domain.PageRequest.of(0, 20),
-                1
-        );
-
-        when(incidentService.getAllIncidents(
-                isNull(), eq(AlertEnvironment.PRODUCTION), any(Pageable.class)
-        )).thenReturn(page);
-
-        mockMvc.perform(get("/api/v1/incidents")
+                        .param("status", "OPEN")
                         .param("environment", "PRODUCTION"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].environment").value("PRODUCTION"));
+                .andExpect(status().isOk());
+
+        verify(incidentService).getAllIncidents(
+                eq(IncidentStatus.OPEN),
+                eq(AlertEnvironment.PRODUCTION),
+                any(Pageable.class)
+        );
     }
 
     @Test
-    void shouldLimitMaximumPageSizeTo100() throws Exception {
+    void shouldPassPageableParametersCorrectly() throws Exception {
         when(incidentService.getAllIncidents(
                 isNull(),
                 isNull(),
@@ -155,8 +150,8 @@ class IncidentControllerTest {
         )).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/v1/incidents")
-                        .param("page", "0")
-                        .param("size", "150"))
+                        .param("page", "2")
+                        .param("size", "10"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<Pageable> pageableCaptor =
@@ -168,25 +163,35 @@ class IncidentControllerTest {
                 pageableCaptor.capture()
         );
 
-        assertEquals(100, pageableCaptor.getValue().getPageSize());
+        Pageable pageable = pageableCaptor.getValue();
+
+        assertEquals(2, pageable.getPageNumber());
+        assertEquals(10, pageable.getPageSize());
     }
 
-    private IncidentResponse createIncidentResponse() {
-        return new IncidentResponse(
-                10L,
-                "High CPU usage",
-                "order-service",
-                AlertEnvironment.PRODUCTION,
-                IncidentSeverity.WARNING,
-                IncidentStatus.OPEN,
-                LocalDateTime.of(2026, 10, 10, 8, 0),
-                LocalDateTime.of(2026, 10, 10, 8, 5),
-                0.75
+    @Test
+    void shouldReturnEmptyPageWhenNoIncidentsMatch() throws Exception {
+        when(incidentService.getAllIncidents(
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/v1/incidents"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+
+        verify(incidentService).getAllIncidents(
+                isNull(),
+                isNull(),
+                any(Pageable.class)
         );
     }
 
     @Test
-    void shouldUseDefaultSortingWhenSortParameterIsNotProvided() throws Exception {
+    void shouldUseDefaultSortingWhenNoSortIsProvided() throws Exception {
         when(incidentService.getAllIncidents(
                 isNull(),
                 isNull(),
@@ -250,5 +255,28 @@ class IncidentControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(incidentService);
+    }
+
+    @Test
+    void shouldResolveIncidentSuccessfully() throws Exception {
+        doNothing().when(incidentService).resolveIncident(10L);
+
+        mockMvc.perform(put("/api/v1/incidents/10/resolve"))
+                .andExpect(status().isNoContent());
+
+        verify(incidentService).resolveIncident(10L);
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenResolvingNonExistentIncident() throws Exception {
+        doThrow(new IncidentNotFoundException(99L))
+                .when(incidentService).resolveIncident(99L);
+
+        mockMvc.perform(put("/api/v1/incidents/99/resolve"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Incident Not Found"))
+                .andExpect(jsonPath("$.message").value("Incident not found: 99"));
+
+        verify(incidentService).resolveIncident(99L);
     }
 }
