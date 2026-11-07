@@ -115,6 +115,7 @@ class DefaultAlertCorrelationEngineRulesTest {
         assertFalse(result.explanations().isEmpty());
         assertEquals(4, result.explanations().size());
         assertTrue(result.explanations().stream().allMatch(RuleEvaluation::matched));
+        assertEquals("v1.0", result.policyVersion());
 
         verify(incidentAlertService)
                 .attachAlert(50L, 2L, result.score());

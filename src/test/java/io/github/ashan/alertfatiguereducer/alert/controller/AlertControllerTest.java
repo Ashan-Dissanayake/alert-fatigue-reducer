@@ -94,7 +94,8 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.alert.type").value("CPU_HIGH"))
                 .andExpect(jsonPath("$.correlationAction").value("NEW_INCIDENT"))
                 .andExpect(jsonPath("$.incidentId").value(10))
-                .andExpect(jsonPath("$.correlationScore").value(0.0));
+                .andExpect(jsonPath("$.correlationScore").value(0.0))
+                .andExpect(jsonPath("$.policyVersion").value("v1.0"));
 
         verify(alertService).createAlert(any(CreateAlertRequest.class));
     }
@@ -351,7 +352,8 @@ class AlertControllerTest {
                 CorrelationAction.ATTACHED_TO_INCIDENT,
                 42L,
                 0.45,
-                explanations
+                explanations,
+                "v1.0"
         );
 
         when(alertService.createAlert(any(CreateAlertRequest.class))).thenReturn(response);
@@ -363,6 +365,7 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.correlationAction").value("ATTACHED_TO_INCIDENT"))
                 .andExpect(jsonPath("$.incidentId").value(42))
                 .andExpect(jsonPath("$.correlationScore").value(0.45))
+                .andExpect(jsonPath("$.policyVersion").value("v1.0"))
                 .andExpect(jsonPath("$.explanations[0].ruleName").value("SameServiceRule"))
                 .andExpect(jsonPath("$.explanations[0].score").value(0.30))
                 .andExpect(jsonPath("$.explanations[0].matched").value(true))

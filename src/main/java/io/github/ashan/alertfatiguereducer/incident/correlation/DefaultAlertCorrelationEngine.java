@@ -77,7 +77,8 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                             CorrelationAction.ATTACHED_TO_INCIDENT,
                             incident.getId(),
                             score,
-                            evaluations
+                            evaluations,
+                            correlationProperties.getPolicyVersion()
                     );
                 })
                 .filter(result ->
@@ -123,7 +124,8 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                                     correlationProperties.getThreshold(),
                                     false,
                                     "No existing candidate incident met the correlation threshold of " + correlationProperties.getThreshold()
-                            ))
+                            )),
+                            correlationProperties.getPolicyVersion()
                     );
                 });
     }

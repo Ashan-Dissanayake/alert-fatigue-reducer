@@ -36,7 +36,13 @@ public record AlertCorrelationResponse(
         double correlationScore,
 
         @Schema(description = "Rule-by-rule evaluation breakdown explaining why the incident was selected")
-        List<RuleEvaluation> explanations
+        List<RuleEvaluation> explanations,
+
+        @Schema(
+                description = "Correlation policy version applied during evaluation",
+                example = "v1.0"
+        )
+        String policyVersion
 ) {
     public AlertCorrelationResponse(
             AlertResponse alert,
@@ -44,6 +50,16 @@ public record AlertCorrelationResponse(
             Long incidentId,
             double correlationScore
     ) {
-        this(alert, correlationAction, incidentId, correlationScore, List.of());
+        this(alert, correlationAction, incidentId, correlationScore, List.of(), "v1.0");
+    }
+
+    public AlertCorrelationResponse(
+            AlertResponse alert,
+            CorrelationAction correlationAction,
+            Long incidentId,
+            double correlationScore,
+            List<RuleEvaluation> explanations
+    ) {
+        this(alert, correlationAction, incidentId, correlationScore, explanations, "v1.0");
     }
 }

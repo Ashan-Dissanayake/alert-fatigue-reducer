@@ -94,4 +94,21 @@ class CorrelationPropertiesTest {
         properties.setTimeProximityMaxScore(0.10); // sum = 0.60
         assertDoesNotThrow(properties::validateWeightSum);
     }
+
+    // ── Policy version validation ────────────────────────────────────────────
+
+    @Test
+    void shouldRejectBlankPolicyVersion() {
+        CorrelationProperties properties = new CorrelationProperties();
+        properties.setPolicyVersion("   ");
+
+        assertFalse(validator.validate(properties).isEmpty());
+    }
+
+    @Test
+    void shouldHaveDefaultPolicyVersion() {
+        CorrelationProperties properties = new CorrelationProperties();
+
+        assertEquals("v1.0", properties.getPolicyVersion());
+    }
 }

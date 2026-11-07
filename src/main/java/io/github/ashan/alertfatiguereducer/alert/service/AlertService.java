@@ -41,7 +41,8 @@ public class AlertService {
                 correlationResult.action(),
                 correlationResult.incidentId(),
                 correlationResult.score(),
-                correlationResult.explanations()
+                correlationResult.explanations(),
+                correlationResult.policyVersion()
         );
     }
 }
