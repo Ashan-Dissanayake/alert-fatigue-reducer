@@ -8,16 +8,15 @@ import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepositor
 import io.github.ashan.alertfatiguereducer.incident.service.CreateIncidentCommand;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentAlertService;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
-import org.springframework.transaction.annotation.Transactional;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
 
     private final IncidentRepository incidentRepository;
@@ -26,6 +25,23 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
     private final List<CorrelationRule> correlationRules;
     private final CorrelationProperties correlationProperties;
     private final CorrelationLockService correlationLockService;
+
+    @Autowired
+    public DefaultAlertCorrelationEngine(
+            IncidentRepository incidentRepository,
+            IncidentAlertService incidentAlertService,
+            IncidentService incidentService,
+            List<CorrelationRule> correlationRules,
+            CorrelationProperties correlationProperties,
+            CorrelationLockService correlationLockService
+    ) {
+        this.incidentRepository = incidentRepository;
+        this.incidentAlertService = incidentAlertService;
+        this.incidentService = incidentService;
+        this.correlationRules = correlationRules;
+        this.correlationProperties = correlationProperties;
+        this.correlationLockService = correlationLockService;
+    }
 
     /**
      * Backward-compatible constructor for existing tests and non-locking execution contexts.
