@@ -25,6 +25,27 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
     private final IncidentService incidentService;
     private final List<CorrelationRule> correlationRules;
     private final CorrelationProperties correlationProperties;
+    private final CorrelationLockService correlationLockService;
+
+    /**
+     * Backward-compatible constructor for existing tests and non-locking execution contexts.
+     */
+    public DefaultAlertCorrelationEngine(
+            IncidentRepository incidentRepository,
+            IncidentAlertService incidentAlertService,
+            IncidentService incidentService,
+            List<CorrelationRule> correlationRules,
+            CorrelationProperties correlationProperties
+    ) {
+        this(
+                incidentRepository,
+                incidentAlertService,
+                incidentService,
+                correlationRules,
+                correlationProperties,
+                (environment, service) -> {}
+        );
+    }
 
     private static final Comparator<CandidateMatch> CANDIDATE_COMPARATOR = Comparator
             .<CandidateMatch>comparingDouble(m -> m.result().score())
@@ -42,6 +63,9 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
     @Override
     @Transactional
     public CorrelationResult correlate(Alert alert) {
+        // Acquire service-level transaction advisory lock to prevent concurrent correlation races
+        correlationLockService.acquireLock(alert.getEnvironment(), alert.getService());
+
         LocalDateTime cutoff = alert.getTimestamp()
                 .minusMinutes(correlationProperties.getWindowMinutes());
 
