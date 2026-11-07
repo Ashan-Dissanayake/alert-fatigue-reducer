@@ -26,6 +26,19 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
     private final List<CorrelationRule> correlationRules;
     private final CorrelationProperties correlationProperties;
 
+    private static final Comparator<CandidateMatch> CANDIDATE_COMPARATOR = Comparator
+            .<CandidateMatch>comparingDouble(m -> m.result().score())
+            .thenComparing(
+                    m -> m.incident().getLastUpdatedAt(),
+                    Comparator.nullsLast(Comparator.naturalOrder())
+            )
+            .thenComparing(
+                    m -> m.incident().getId(),
+                    Comparator.nullsLast(Comparator.naturalOrder())
+            );
+
+    private record CandidateMatch(Incident incident, CorrelationResult result) {}
+
     @Override
     @Transactional
     public CorrelationResult correlate(Alert alert) {
@@ -73,19 +86,22 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                             .mapToDouble(RuleEvaluation::score)
                             .sum();
 
-                    return new CorrelationResult(
+                    CorrelationResult result = new CorrelationResult(
                             CorrelationAction.ATTACHED_TO_INCIDENT,
                             incident.getId(),
                             score,
                             evaluations,
                             correlationProperties.getPolicyVersion()
                     );
+
+                    return new CandidateMatch(incident, result);
                 })
-                .filter(result ->
-                        result.score() >= correlationProperties.getThreshold()
+                .filter(match ->
+                        match.result().score() >= correlationProperties.getThreshold()
                 )
-                .max(Comparator.comparingDouble(CorrelationResult::score))
-                .map(result -> {
+                .max(CANDIDATE_COMPARATOR)
+                .map(match -> {
+                    CorrelationResult result = match.result();
                     incidentAlertService.attachAlert(
                             result.incidentId(),
                             alert.getId(),
