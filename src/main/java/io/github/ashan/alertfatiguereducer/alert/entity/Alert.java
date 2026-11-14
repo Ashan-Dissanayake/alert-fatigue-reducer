@@ -13,12 +13,8 @@ import java.time.LocalDateTime;
         name = "alerts",
         indexes = {
                 @Index(
-                        name = "idx_alerts_service_environment",
-                        columnList = "service, environment"
-                ),
-                @Index(
-                        name = "idx_alerts_timestamp",
-                        columnList = "timestamp"
+                        name = "idx_alerts_service_environment_timestamp",
+                        columnList = "service, environment, timestamp"
                 )
         }
 )

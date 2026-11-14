@@ -3,15 +3,15 @@ package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 import io.github.ashan.alertfatiguereducer.alert.entity.Alert;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
+import io.github.ashan.alertfatiguereducer.incident.correlation.RuleEvaluation;
 import io.github.ashan.alertfatiguereducer.incident.entity.Incident;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 class SameServiceRuleTest {
-
 
     CorrelationProperties properties = new CorrelationProperties();
     private final SameServiceRule rule = new SameServiceRule(properties);
@@ -60,5 +60,38 @@ class SameServiceRuleTest {
                 0.0,
                 rule.evaluate(new CorrelationContext(alert, incident, List.of()))
         );
+    }
+
+    @Test
+    void shouldProvideDetailedExplanationWhenServicesMatch() {
+        Alert alert = new Alert();
+        alert.setService("order-service");
+
+        Incident incident = new Incident();
+        incident.setService("order-service");
+
+        RuleEvaluation explanation = rule.evaluateExplanation(new CorrelationContext(alert, incident, List.of()));
+
+        assertEquals("SameServiceRule", explanation.ruleName());
+        assertEquals(0.30, explanation.score());
+        assertEquals(0.30, explanation.weight());
+        assertTrue(explanation.matched());
+        assertTrue(explanation.reason().contains("Services match"));
+    }
+
+    @Test
+    void shouldProvideDetailedExplanationWhenServicesDiffer() {
+        Alert alert = new Alert();
+        alert.setService("order-service");
+
+        Incident incident = new Incident();
+        incident.setService("payment-service");
+
+        RuleEvaluation explanation = rule.evaluateExplanation(new CorrelationContext(alert, incident, List.of()));
+
+        assertEquals("SameServiceRule", explanation.ruleName());
+        assertEquals(0.0, explanation.score());
+        assertFalse(explanation.matched());
+        assertTrue(explanation.reason().contains("Services do not match"));
     }
 }

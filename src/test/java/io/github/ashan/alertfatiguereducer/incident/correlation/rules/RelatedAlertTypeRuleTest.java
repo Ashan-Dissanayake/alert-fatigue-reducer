@@ -1,6 +1,8 @@
 package io.github.ashan.alertfatiguereducer.incident.correlation.rules;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
+import io.github.ashan.alertfatiguereducer.incident.correlation.RuleEvaluation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -56,95 +59,29 @@ class RelatedAlertTypeRuleTest {
     }
 
     @Test
-    void shouldReturnZeroWhenRelatedAlertsAreEmpty() {
-        when(relationshipStore.findRelatedTypes("CPU_HIGH"))
-                .thenReturn(Set.of("LATENCY_HIGH"));
-
-        CorrelationContext context = new CorrelationContext(
-                createAlert("CPU_HIGH"),
+    void shouldReturnZeroWhenIncomingTypeIsNull() {
+        CorrelationContext context = createContext(
                 null,
-                List.of()
+                "CPU_HIGH"
         );
 
         assertEquals(0.0, rule.evaluate(context));
-    }
-
-    @Test
-    void shouldReturnZeroWhenIncomingAlertTypeIsInvalid() {
-        CorrelationContext context = createContext(
-                "INVALID_TYPE",
-                "LATENCY_HIGH"
-        );
-
-        assertEquals(0.0, rule.evaluate(context));
-
-        verify(relationshipStore, never())
-                .findRelatedTypes("INVALID_TYPE");
-    }
-
-    @Test
-    void shouldReturnZeroWhenExistingAlertTypeIsInvalid() {
-        when(relationshipStore.findRelatedTypes("LATENCY_HIGH"))
-                .thenReturn(Set.of("CPU_HIGH"));
-
-        CorrelationContext context = createContext(
-                "LATENCY_HIGH",
-                "INVALID_TYPE"
-        );
-
-        assertEquals(0.0, rule.evaluate(context));
-    }
-
-    @Test
-    void shouldReturnZeroWhenIncomingAlertTypeIsNull() {
-        CorrelationContext context = createContext(null, "LATENCY_HIGH");
-
-        assertEquals(0.0, rule.evaluate(context));
-
         verify(relationshipStore, never()).findRelatedTypes(null);
     }
 
     @Test
-    void shouldReturnScoreWhenCpuHighIsRelatedToLatencyHigh() {
-        when(relationshipStore.findRelatedTypes("CPU_HIGH"))
-                .thenReturn(Set.of("LATENCY_HIGH"));
-
+    void shouldReturnZeroWhenIncomingTypeIsUnknown() {
         CorrelationContext context = createContext(
-                "CPU_HIGH",
-                "LATENCY_HIGH"
+                "UNKNOWN_TYPE",
+                "CPU_HIGH"
         );
 
-        assertEquals(0.30, rule.evaluate(context));
+        assertEquals(0.0, rule.evaluate(context));
+        verify(relationshipStore, never()).findRelatedTypes("UNKNOWN_TYPE");
     }
 
     @Test
-    void shouldReturnScoreWhenErrorRateHighIsRelatedToTimeout() {
-        when(relationshipStore.findRelatedTypes("ERROR_RATE_HIGH"))
-                .thenReturn(Set.of("TIMEOUT"));
-
-        CorrelationContext context = createContext(
-                "ERROR_RATE_HIGH",
-                "TIMEOUT"
-        );
-
-        assertEquals(0.30, rule.evaluate(context));
-    }
-
-    @Test
-    void shouldReturnScoreWhenTimeoutIsRelatedToErrorRateHigh() {
-        when(relationshipStore.findRelatedTypes("TIMEOUT"))
-                .thenReturn(Set.of("ERROR_RATE_HIGH"));
-
-        CorrelationContext context = createContext(
-                "TIMEOUT",
-                "ERROR_RATE_HIGH"
-        );
-
-        assertEquals(0.30, rule.evaluate(context));
-    }
-
-    @Test
-    void shouldReturnZeroWhenStoreHasNoRelationships() {
+    void shouldReturnZeroWhenNoRelationshipsAreRegistered() {
         when(relationshipStore.findRelatedTypes("CPU_HIGH"))
                 .thenReturn(Set.of());
 
@@ -154,6 +91,115 @@ class RelatedAlertTypeRuleTest {
         );
 
         assertEquals(0.0, rule.evaluate(context));
+    }
+
+    @Test
+    void shouldMatchWhenAnyRelatedAlertMatches() {
+        when(relationshipStore.findRelatedTypes("LATENCY_HIGH"))
+                .thenReturn(Set.of("CPU_HIGH"));
+
+        CorrelationContext context = new CorrelationContext(
+                createAlert("LATENCY_HIGH"),
+                null,
+                List.of(
+                        createAlert("DISK_FULL"),
+                        createAlert("CPU_HIGH")
+                )
+        );
+
+        assertEquals(0.30, rule.evaluate(context));
+    }
+
+    @Test
+    void shouldHandleNullAlertTypesInRelatedAlerts() {
+        when(relationshipStore.findRelatedTypes("LATENCY_HIGH"))
+                .thenReturn(Set.of("CPU_HIGH"));
+
+        CorrelationContext context = new CorrelationContext(
+                createAlert("LATENCY_HIGH"),
+                null,
+                List.of(
+                        createAlert(null),
+                        createAlert("CPU_HIGH")
+                )
+        );
+
+        assertEquals(0.30, rule.evaluate(context));
+    }
+
+    @Test
+    void shouldReturnZeroWhenRelatedAlertsListIsEmpty() {
+        when(relationshipStore.findRelatedTypes("LATENCY_HIGH"))
+                .thenReturn(Set.of("CPU_HIGH"));
+
+        CorrelationContext context = new CorrelationContext(
+                createAlert("LATENCY_HIGH"),
+                null,
+                List.of()
+        );
+
+        assertEquals(0.0, rule.evaluate(context));
+    }
+
+    @Test
+    void shouldBeCaseSensitive() {
+        CorrelationContext context = createContext(
+                "latency_high",
+                "CPU_HIGH"
+        );
+
+        assertEquals(0.0, rule.evaluate(context));
+        verify(relationshipStore, never()).findRelatedTypes("latency_high");
+    }
+
+    @Test
+    void shouldNotSelfMatchWithoutExplicitSelfRelationship() {
+        when(relationshipStore.findRelatedTypes("CPU_HIGH"))
+                .thenReturn(Set.of("LATENCY_HIGH"));
+
+        CorrelationContext context = createContext(
+                "CPU_HIGH",
+                "CPU_HIGH"
+        );
+
+        assertEquals(0.0, rule.evaluate(context));
+    }
+
+    @Test
+    void shouldProvideExplanationWhenRelatedTypeMatches() {
+        when(relationshipStore.findRelatedTypes("LATENCY_HIGH"))
+                .thenReturn(Set.of("CPU_HIGH"));
+
+        CorrelationContext context = createContext(
+                "LATENCY_HIGH",
+                "CPU_HIGH"
+        );
+
+        RuleEvaluation explanation = rule.evaluateExplanation(context);
+
+        assertEquals("RelatedAlertTypeRule", explanation.ruleName());
+        assertEquals(0.30, explanation.score());
+        assertEquals(0.30, explanation.weight());
+        assertTrue(explanation.matched());
+        assertTrue(explanation.reason().contains("relates to incident alert type"));
+    }
+
+    @Test
+    void shouldProvideExplanationWhenTypeHasNoRelationship() {
+        when(relationshipStore.findRelatedTypes("CPU_HIGH"))
+                .thenReturn(Set.of("LATENCY_HIGH"));
+
+        CorrelationContext context = createContext(
+                "CPU_HIGH",
+                "TIMEOUT"
+        );
+
+        RuleEvaluation explanation = rule.evaluateExplanation(context);
+
+        assertEquals("RelatedAlertTypeRule", explanation.ruleName());
+        assertEquals(0.0, explanation.score());
+        assertFalse(explanation.matched());
+        assertTrue(explanation.reason().contains("has no relationships matching"));
     }
 
     private CorrelationContext createContext(

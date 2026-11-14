@@ -9,6 +9,7 @@ import io.github.ashan.alertfatiguereducer.alert.entity.AlertSource;
 import io.github.ashan.alertfatiguereducer.alert.service.AlertService;
 import io.github.ashan.alertfatiguereducer.alert.validation.FiniteNumberValidator;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationAction;
+import io.github.ashan.alertfatiguereducer.incident.correlation.RuleEvaluation;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -92,7 +94,8 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.alert.type").value("CPU_HIGH"))
                 .andExpect(jsonPath("$.correlationAction").value("NEW_INCIDENT"))
                 .andExpect(jsonPath("$.incidentId").value(10))
-                .andExpect(jsonPath("$.correlationScore").value(0.0));
+                .andExpect(jsonPath("$.correlationScore").value(0.0))
+                .andExpect(jsonPath("$.policyVersion").value("v1.0"));
 
         verify(alertService).createAlert(any(CreateAlertRequest.class));
     }
@@ -307,5 +310,66 @@ class AlertControllerTest {
         assertThat(validator.isValid(Double.NEGATIVE_INFINITY, null)).isFalse();
         assertThat(validator.isValid(95.0, null)).isTrue();
         assertThat(validator.isValid(null, null)).isTrue();
+    }
+
+    @Test
+    void shouldIncludeRuleExplanationsInCorrelationResponse() throws Exception {
+        CreateAlertRequest request = new CreateAlertRequest(
+                AlertSource.CUSTOM,
+                "payment-service",
+                AlertEnvironment.PRODUCTION,
+                "CPU_HIGH",
+                AlertSeverity.CRITICAL,
+                "High CPU",
+                LocalDateTime.of(2026, 10, 8, 9, 31),
+                "cpu",
+                95.0,
+                80.0
+        );
+
+        AlertResponse alertResponse = new AlertResponse(
+                2L,
+                AlertSource.CUSTOM,
+                "payment-service",
+                AlertEnvironment.PRODUCTION,
+                "CPU_HIGH",
+                AlertSeverity.CRITICAL,
+                "High CPU",
+                LocalDateTime.of(2026, 10, 8, 9, 31),
+                "cpu",
+                95.0,
+                80.0,
+                LocalDateTime.of(2026, 10, 8, 9, 32)
+        );
+
+        List<RuleEvaluation> explanations = List.of(
+                new RuleEvaluation("SameServiceRule", 0.30, 0.30, true, "Services match: payment-service"),
+                new RuleEvaluation("SameEnvironmentRule", 0.15, 0.15, true, "Environments match: PRODUCTION")
+        );
+
+        AlertCorrelationResponse response = new AlertCorrelationResponse(
+                alertResponse,
+                CorrelationAction.ATTACHED_TO_INCIDENT,
+                42L,
+                0.45,
+                explanations,
+                "v1.0"
+        );
+
+        when(alertService.createAlert(any(CreateAlertRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.correlationAction").value("ATTACHED_TO_INCIDENT"))
+                .andExpect(jsonPath("$.incidentId").value(42))
+                .andExpect(jsonPath("$.correlationScore").value(0.45))
+                .andExpect(jsonPath("$.policyVersion").value("v1.0"))
+                .andExpect(jsonPath("$.explanations[0].ruleName").value("SameServiceRule"))
+                .andExpect(jsonPath("$.explanations[0].score").value(0.30))
+                .andExpect(jsonPath("$.explanations[0].matched").value(true))
+                .andExpect(jsonPath("$.explanations[0].reason").value("Services match: payment-service"))
+                .andExpect(jsonPath("$.explanations[1].ruleName").value("SameEnvironmentRule"));
     }
 }

@@ -8,16 +8,15 @@ import io.github.ashan.alertfatiguereducer.incident.repository.IncidentRepositor
 import io.github.ashan.alertfatiguereducer.incident.service.CreateIncidentCommand;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentAlertService;
 import io.github.ashan.alertfatiguereducer.incident.service.IncidentService;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
 
     private final IncidentRepository incidentRepository;
@@ -25,11 +24,64 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
     private final IncidentService incidentService;
     private final List<CorrelationRule> correlationRules;
     private final CorrelationProperties correlationProperties;
+    private final CorrelationLockService correlationLockService;
 
+    @Autowired
+    public DefaultAlertCorrelationEngine(
+            IncidentRepository incidentRepository,
+            IncidentAlertService incidentAlertService,
+            IncidentService incidentService,
+            List<CorrelationRule> correlationRules,
+            CorrelationProperties correlationProperties,
+            CorrelationLockService correlationLockService
+    ) {
+        this.incidentRepository = incidentRepository;
+        this.incidentAlertService = incidentAlertService;
+        this.incidentService = incidentService;
+        this.correlationRules = correlationRules;
+        this.correlationProperties = correlationProperties;
+        this.correlationLockService = correlationLockService;
+    }
+
+    /**
+     * Backward-compatible constructor for existing tests and non-locking execution contexts.
+     */
+    public DefaultAlertCorrelationEngine(
+            IncidentRepository incidentRepository,
+            IncidentAlertService incidentAlertService,
+            IncidentService incidentService,
+            List<CorrelationRule> correlationRules,
+            CorrelationProperties correlationProperties
+    ) {
+        this(
+                incidentRepository,
+                incidentAlertService,
+                incidentService,
+                correlationRules,
+                correlationProperties,
+                (environment, service) -> {}
+        );
+    }
+
+    private static final Comparator<CandidateMatch> CANDIDATE_COMPARATOR = Comparator
+            .<CandidateMatch>comparingDouble(m -> m.result().score())
+            .thenComparing(
+                    m -> m.incident().getLastUpdatedAt(),
+                    Comparator.nullsLast(Comparator.naturalOrder())
+            )
+            .thenComparing(
+                    m -> m.incident().getId(),
+                    Comparator.nullsLast(Comparator.naturalOrder())
+            );
+
+    private record CandidateMatch(Incident incident, CorrelationResult result) {}
 
     @Override
     @Transactional
     public CorrelationResult correlate(Alert alert) {
+        // Acquire service-level transaction advisory lock to prevent concurrent correlation races
+        correlationLockService.acquireLock(alert.getEnvironment(), alert.getService());
+
         LocalDateTime cutoff = alert.getTimestamp()
                 .minusMinutes(correlationProperties.getWindowMinutes());
 
@@ -53,21 +105,43 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                             relatedAlerts
                     );
 
-                    double score = correlationRules.stream()
-                            .mapToDouble(rule -> rule.evaluate(context))
+                    List<RuleEvaluation> evaluations = correlationRules.stream()
+                            .map(rule -> {
+                                RuleEvaluation eval = rule.evaluateExplanation(context);
+                                if (eval != null) {
+                                    return eval;
+                                }
+                                double fallbackScore = rule.evaluate(context);
+                                return new RuleEvaluation(
+                                        rule.getClass().getSimpleName(),
+                                        fallbackScore,
+                                        fallbackScore,
+                                        fallbackScore > 0.0,
+                                        fallbackScore > 0.0 ? "Rule condition met" : "Rule condition not met"
+                                );
+                            })
+                            .toList();
+
+                    double score = evaluations.stream()
+                            .mapToDouble(RuleEvaluation::score)
                             .sum();
 
-                    return new CorrelationResult(
+                    CorrelationResult result = new CorrelationResult(
                             CorrelationAction.ATTACHED_TO_INCIDENT,
                             incident.getId(),
-                            score
+                            score,
+                            evaluations,
+                            correlationProperties.getPolicyVersion()
                     );
+
+                    return new CandidateMatch(incident, result);
                 })
-                .filter(result ->
-                        result.score() >= correlationProperties.getThreshold()
+                .filter(match ->
+                        match.result().score() >= correlationProperties.getThreshold()
                 )
-                .max(Comparator.comparingDouble(CorrelationResult::score))
-                .map(result -> {
+                .max(CANDIDATE_COMPARATOR)
+                .map(match -> {
+                    CorrelationResult result = match.result();
                     incidentAlertService.attachAlert(
                             result.incidentId(),
                             alert.getId(),
@@ -76,9 +150,6 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
 
                     return result;
                 })
-
-
-
                 .orElseGet(() -> {
                     Incident incident = incidentService.createIncident(
                             new CreateIncidentCommand(
@@ -86,7 +157,7 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                                     alert.getService(),
                                     alert.getEnvironment(),
                                     IncidentSeverity.valueOf(
-                                            alert.getSeverity().name()
+                                             alert.getSeverity().name()
                                     ),
                                     alert.getTimestamp(),
                                     null
@@ -102,7 +173,15 @@ public class DefaultAlertCorrelationEngine implements AlertCorrelationEngine {
                     return new CorrelationResult(
                             CorrelationAction.NEW_INCIDENT,
                             incident.getId(),
-                            0.0
+                            0.0,
+                            List.of(new RuleEvaluation(
+                                    "CorrelationThreshold",
+                                    0.0,
+                                    correlationProperties.getThreshold(),
+                                    false,
+                                    "No existing candidate incident met the correlation threshold of " + correlationProperties.getThreshold()
+                            )),
+                            correlationProperties.getPolicyVersion()
                     );
                 });
     }

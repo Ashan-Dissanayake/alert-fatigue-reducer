@@ -6,10 +6,13 @@ import io.github.ashan.alertfatiguereducer.incident.correlation.AlertRelationshi
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationContext;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationProperties;
 import io.github.ashan.alertfatiguereducer.incident.correlation.CorrelationRule;
-import java.util.Set;
-
+import io.github.ashan.alertfatiguereducer.incident.correlation.RuleEvaluation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -18,13 +21,18 @@ public class RelatedAlertTypeRule implements CorrelationRule {
     private final AlertRelationshipStore relationshipStore;
     private final CorrelationProperties properties;
 
-
     @Override
-    public double evaluate(CorrelationContext context) {
+    public RuleEvaluation evaluateExplanation(CorrelationContext context) {
         Alert incomingAlert = context.alert();
 
         if (incomingAlert.getType() == null) {
-            return 0.0;
+            return new RuleEvaluation(
+                    "RelatedAlertTypeRule",
+                    0.0,
+                    properties.getRelatedAlertTypeWeight(),
+                    false,
+                    "Incoming alert type is null"
+            );
         }
 
         String incomingType = incomingAlert.getType();
@@ -32,21 +40,51 @@ public class RelatedAlertTypeRule implements CorrelationRule {
         try {
             AlertType.valueOf(incomingType);
         } catch (IllegalArgumentException exception) {
-            return 0.0;
+            return new RuleEvaluation(
+                    "RelatedAlertTypeRule",
+                    0.0,
+                    properties.getRelatedAlertTypeWeight(),
+                    false,
+                    "Alert type '" + incomingType + "' is not a supported AlertType"
+            );
         }
 
-        Set<String> relatedTypes =
-                relationshipStore.findRelatedTypes(incomingType);
+        Set<String> relatedTypes = relationshipStore.findRelatedTypes(incomingType);
 
         if (relatedTypes.isEmpty()) {
-            return 0.0;
+            return new RuleEvaluation(
+                    "RelatedAlertTypeRule",
+                    0.0,
+                    properties.getRelatedAlertTypeWeight(),
+                    false,
+                    "No related alert types registered in database for type: " + incomingType
+            );
         }
 
-        return context.relatedAlerts().stream()
+        List<String> matchedTypes = context.relatedAlerts().stream()
                 .map(Alert::getType)
-                .filter(type -> type != null)
-                .anyMatch(relatedTypes::contains)
-                ? properties.getRelatedAlertTypeWeight()
-                : 0.0;
+                .filter(Objects::nonNull)
+                .filter(relatedTypes::contains)
+                .distinct()
+                .toList();
+
+        boolean matched = !matchedTypes.isEmpty();
+        double score = matched ? properties.getRelatedAlertTypeWeight() : 0.0;
+        String reason = matched
+                ? "Alert type '" + incomingType + "' relates to incident alert type(s): " + matchedTypes
+                : "Alert type '" + incomingType + "' has no relationships matching existing incident alerts";
+
+        return new RuleEvaluation(
+                "RelatedAlertTypeRule",
+                score,
+                properties.getRelatedAlertTypeWeight(),
+                matched,
+                reason
+        );
+    }
+
+    @Override
+    public double evaluate(CorrelationContext context) {
+        return evaluateExplanation(context).score();
     }
 }

@@ -7,7 +7,15 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "incident_alerts")
+@Table(
+        name = "incident_alerts",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_incident_alerts_alert_id",
+                        columnNames = "alert_id"
+                )
+        }
+)
 @IdClass(IncidentAlertId.class)
 @Setter
 @Getter
