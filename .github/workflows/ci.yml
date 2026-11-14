@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, feature/**]
+    branches: [main, master]
   pull_request:
     branches: [main, master]
 
@@ -48,4 +48,4 @@ jobs:
 
       - name: Run Integration Tests (Container-backed)
         run: ./mvnw --batch-mode --no-transfer-progress test -Dtest="*IntegrationTest,AlertFatigueReducerApplicationTests"
-        continue-on-error: true # Prevents CI blocking if GitHub runner has Docker API handshake mismatch
+        continue-on-error: true
