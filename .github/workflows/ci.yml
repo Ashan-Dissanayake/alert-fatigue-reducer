@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, feature/**]
   pull_request:
-    branches: [main, master] # Feature branches walin master ekata PR daddi meka trigger wenawa
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -16,7 +16,9 @@ jobs:
     timeout-minutes: 15
 
     env:
-      SPRING_PROFILES_ACTIVE: test # GitHub Actions Runner eka athule test profile eka active karanawa
+      SPRING_PROFILES_ACTIVE: test
+      DOCKER_API_VERSION: "1.44"
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
 
     steps:
       - name: Checkout repository
@@ -30,7 +32,9 @@ jobs:
           cache: maven
 
       - name: Verify Docker availability
-        run: docker info
+        run: |
+          docker info
+          docker version
 
       - name: Make Maven Wrapper executable
         run: chmod +x mvnw
