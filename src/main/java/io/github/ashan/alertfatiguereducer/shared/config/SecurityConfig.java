@@ -24,9 +24,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final RateLimitingFilter rateLimitingFilter;
+    private final CorrelationIdFilter correlationIdFilter;
 
-    public SecurityConfig(@Autowired(required = false) RateLimitingFilter rateLimitingFilter) {
+    public SecurityConfig(
+            @Autowired(required = false) RateLimitingFilter rateLimitingFilter,
+            @Autowired(required = false) CorrelationIdFilter correlationIdFilter
+    ) {
         this.rateLimitingFilter = rateLimitingFilter;
+        this.correlationIdFilter = correlationIdFilter;
     }
 
     @Bean
@@ -79,6 +84,11 @@ public class SecurityConfig {
 
         if (rateLimitingFilter != null) {
             http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
+            if (correlationIdFilter != null) {
+                http.addFilterBefore(correlationIdFilter, RateLimitingFilter.class);
+            }
+        } else if (correlationIdFilter != null) {
+            http.addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class);
         }
 
         return http.build();

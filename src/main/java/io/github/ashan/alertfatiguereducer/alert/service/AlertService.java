@@ -13,6 +13,7 @@ import io.github.ashan.alertfatiguereducer.incident.correlation.RuleEvaluation;
 import io.github.ashan.alertfatiguereducer.incident.entity.IncidentAlert;
 import io.github.ashan.alertfatiguereducer.incident.repository.IncidentAlertRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AlertService {
@@ -42,6 +44,8 @@ public class AlertService {
 
         if (existingAlertOpt.isPresent()) {
             Alert existingAlert = existingAlertOpt.get();
+            log.info("Duplicate alert detected; skipping correlation [alertId={}, service={}, environment={}, type={}]",
+                    existingAlert.getId(), existingAlert.getService(), existingAlert.getEnvironment(), existingAlert.getType());
             AlertResponse alertResponse = alertMapper.toResponse(existingAlert);
 
             // Lookup existing incident association if already attached
@@ -70,9 +74,14 @@ public class AlertService {
         alert.setCreatedAt(LocalDateTime.now());
 
         Alert savedAlert = alertRepository.save(alert);
+        log.info("Ingested alert [id={}, service={}, environment={}, type={}]",
+                savedAlert.getId(), savedAlert.getService(), savedAlert.getEnvironment(), savedAlert.getType());
 
         CorrelationResult correlationResult =
                 alertCorrelationEngine.correlate(savedAlert);
+        log.info("Correlated alert [id={}] with action={} into incidentId={} (score={}, policyVersion={})",
+                savedAlert.getId(), correlationResult.action(), correlationResult.incidentId(),
+                correlationResult.score(), correlationResult.policyVersion());
 
         AlertResponse alertResponse =
                 alertMapper.toResponse(savedAlert);
