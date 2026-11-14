@@ -1,5 +1,6 @@
 package io.github.ashan.alertfatiguereducer.shared.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,11 +16,18 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    private final RateLimitingFilter rateLimitingFilter;
+
+    public SecurityConfig(@Autowired(required = false) RateLimitingFilter rateLimitingFilter) {
+        this.rateLimitingFilter = rateLimitingFilter;
+    }
 
     @Bean
     PasswordEncoder passwordEncoder() {
@@ -68,6 +76,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/incidents/**").hasAnyRole("OPERATOR", "ADMIN")
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults());
+
+        if (rateLimitingFilter != null) {
+            http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
+        }
 
         return http.build();
     }
