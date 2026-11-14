@@ -21,6 +21,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -59,9 +60,6 @@ class SecurityPenetrationTest {
 
     @MockitoBean
     private IncidentService incidentService;
-
-    private static final String ADMIN_AUTH = basicAuth("admin", "password123");
-    private static final String INGESTION_AUTH = basicAuth("ingestion", "ingestion123");
 
     private static String basicAuth(String username, String password) {
         String token = username + ":" + password;
@@ -109,40 +107,41 @@ class SecurityPenetrationTest {
     // ── 2. HTTP Verb Tampering ───────────────────────────────────────────────
 
     @Test
+    @WithMockUser(username = "admin-user", roles = {"ADMIN"})
     void shouldRejectUnsupportedHttpMethodOnAlertsEndpoint() throws Exception {
         // DELETE is not allowed on /api/v1/alerts
-        mockMvc.perform(delete("/api/v1/alerts")
-                        .header(HttpHeaders.AUTHORIZATION, ADMIN_AUTH))
+        mockMvc.perform(delete("/api/v1/alerts"))
                 .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
+    @WithMockUser(username = "admin-user", roles = {"ADMIN"})
     void shouldRejectUnsupportedHttpMethodOnIncidentResolveEndpoint() throws Exception {
         // POST is not allowed on /api/v1/incidents/{id}/resolve (only PUT)
-        mockMvc.perform(post("/api/v1/incidents/1/resolve")
-                        .header(HttpHeaders.AUTHORIZATION, ADMIN_AUTH))
+        mockMvc.perform(post("/api/v1/incidents/1/resolve"))
                 .andExpect(status().isMethodNotAllowed());
     }
 
     // ── 3. Path Parameter Tampering & Type Safety ────────────────────────────
 
     @Test
+    @WithMockUser(username = "admin-user", roles = {"ADMIN"})
     void shouldRejectNonNumericIncidentIdWithPathTraversalAttempt() throws Exception {
-        mockMvc.perform(get("/api/v1/incidents/..%2F..%2Fetc%2Fpasswd")
-                        .header(HttpHeaders.AUTHORIZATION, ADMIN_AUTH))
+        mockMvc.perform(get("/api/v1/incidents/..%2F..%2Fetc%2Fpasswd"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
+    @WithMockUser(username = "admin-user", roles = {"ADMIN"})
     void shouldRejectAlphabeticalIncidentId() throws Exception {
-        mockMvc.perform(get("/api/v1/incidents/not-a-number")
-                        .header(HttpHeaders.AUTHORIZATION, ADMIN_AUTH))
+        mockMvc.perform(get("/api/v1/incidents/not-a-number"))
                 .andExpect(status().isBadRequest());
     }
 
     // ── 4. Injection Resilience in Payload Fields ────────────────────────────
 
     @Test
+    @WithMockUser(username = "ingestion-bot", roles = {"INGESTION"})
     void shouldSafelyHandleHtmlAndScriptTagsInAlertMessage() throws Exception {
         // Alert payloads containing HTML/XSS markup must be processed safely as plain text
         CreateAlertRequest request = new CreateAlertRequest(
@@ -169,7 +168,6 @@ class SecurityPenetrationTest {
                 ));
 
         mockMvc.perform(post("/api/v1/alerts")
-                        .header(HttpHeaders.AUTHORIZATION, INGESTION_AUTH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -177,6 +175,7 @@ class SecurityPenetrationTest {
     }
 
     @Test
+    @WithMockUser(username = "ingestion-bot", roles = {"INGESTION"})
     void shouldSafelyHandleSqlCharactersInServiceAndMessage() throws Exception {
         // SQL injection probe in text field
         CreateAlertRequest request = new CreateAlertRequest(
@@ -203,7 +202,6 @@ class SecurityPenetrationTest {
                 ));
 
         mockMvc.perform(post("/api/v1/alerts")
-                        .header(HttpHeaders.AUTHORIZATION, INGESTION_AUTH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -212,6 +210,7 @@ class SecurityPenetrationTest {
     // ── 5. Numeric Bound & Floating Point Tampering ──────────────────────────
 
     @Test
+    @WithMockUser(username = "ingestion-bot", roles = {"INGESTION"})
     void shouldRejectNaNAndInfiniteValuesInAlertPayload() throws Exception {
         String payload = """
                 {
@@ -229,7 +228,6 @@ class SecurityPenetrationTest {
                 """;
 
         mockMvc.perform(post("/api/v1/alerts")
-                        .header(HttpHeaders.AUTHORIZATION, INGESTION_AUTH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest());
